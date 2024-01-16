@@ -39,34 +39,9 @@ def init():
         gmoj_login(
             default_user, base64_decry(userlist["users"][default_user]["password"])
         )
-        == 0
+        != 1
     ):
         default_user = ""
-
-
-def main():
-    open = os.system("start " + url)
-
-
-def number():
-    cls = os.system("cls")
-    print("----ghelper----")
-    x = input("请输入题号：")
-    open = os.system("start " + url + "/#main/show/" + x)
-
-
-def topic():
-    cls = os.system("cls")
-    print("----ghelper----")
-    x = input("请输入搜索内容：")
-    open = os.system("start " + url + "/#main/problemset?search=" + x)
-
-
-def user():
-    cls = os.system("cls")
-    x = input("请输入用户名：")
-    open = os.system("start " + url + "/#users/" + x)
-
 
 def pwd_input():
     chars = []
@@ -107,11 +82,20 @@ def base64_decry(ciphertext):
 
 def gmoj_login(username, password):
     geturl = "https://gmoj.net/junior/index.php/main/home"
-    r = requests.get(geturl, headers=headers)
+    try:
+        r = requests.get(geturl, headers=headers,timeout=1)
+    except TimeoutError:
+        print("timeout")
+        pause = os.system("pause")
+        return -1
+    except:
+        print("login error")
+        pause = os.system("pause")
+        return -1
     global cookies
     cookies = r.cookies
     cookies = requests.utils.dict_from_cookiejar(cookies)
-    b = BeautifulSoup(r.text)
+    b = BeautifulSoup(r.text,"html.parser")
     secretkey = b.find("script").text
     prekey = secretkey[secretkey.find("saltl") + 7 : secretkey.find(";") - 1]
     lastkey = secretkey[
@@ -255,13 +239,15 @@ def choose_user():
             username = userlist["users"][users[i - 1]]["username"]
             password = base64_decry(userlist["users"][users[i - 1]]["password"])
             f = 1
-            if gmoj_login(username, password):
+            sit = gmoj_login(username, password)
+            if sit==1:
                 print("成功！")
                 default_user = users[i - 1]
-            else:
-                print("失败")
+                pause = os.system("pause")
+            elif sit==0 :
+                print("账号和密码不匹配")
                 f = 0
-            pause = os.system("pause")
+                pause = os.system("pause")        
             return f
 
 
@@ -273,7 +259,9 @@ def create_user():
     print("请输入密码：", end="")
     password = pwd_input()
     print("")
-    if gmoj_login(username, password):
+    f=1
+    sit  = gmoj_login(username, password)
+    if sit==1:
         print("成功！")
         default_user = username
         user = {username: {"username": username, "password": base64_encry(password)}}
@@ -282,10 +270,12 @@ def create_user():
         with open("user.json", "w+", encoding="utf-8") as f:
             json.dump(userlist, f, indent=4, ensure_ascii=False)
         init()
-    else:
+        pause = os.system("pause")
+    elif sit==0:
         print("失败！")
         f = 0
-    pause = os.system("pause")
+        pause = os.system("pause")
+    else: f=0
     return f
 
 
@@ -308,6 +298,15 @@ def get_html(b, id):
         f.write(str(b.find(type="text/javascript")))
     html_to_pdf("data\\" + id + ".html", id + ".pdf")
 
+def get_match_html(b, id):
+    for i in b.find_all(class_="btn btn-mini btn_copy"):
+        i.decompose()
+    with open("data\\" + id + ".html", "w+", encoding="utf-8") as f:
+        f.write("<head>\n")
+        f.write('  <meta charset="utf-8">\n')
+        f.write("</head>\n")
+        f.write(str(b))
+    html_to_pdf("data\\" + id + ".html", id + ".pdf")
 
 def get_markdown(b, id):
     cls = os.system("cls")
@@ -317,45 +316,92 @@ def get_markdown(b, id):
 
 def get_problem():
     cls = os.system("cls")
+    if default_user=="":
+        print("你还未登录！")
+        pause = os.system("pause")
+        return
     id = input("请输入题号：")
     url = "https://gmoj.net/senior/index.php/main/show/" + id
-    r = requests.get(url, cookies=cookies, headers=headers)
-    b = BeautifulSoup(r.text)
+    try:
+        r = requests.get(url, cookies=cookies, headers=headers)
+    except:
+        print("error")
+        return
+    b = BeautifulSoup(r.text,"html.parser")
+    title = b.find("h4").string
+    if title!="(Standard IO)":
+        title = b.find("h4").find("span").string
+        title = title[0:title.find('.')]
+    else: title = id
+    
     if b.find(style="margin-top: 4px") == None:
-        get_html(b, id)
+        get_html(b, title)
     else:
-        get_markdown(b, id)
+        get_markdown(b, title)
+
+def get_match_problem(id,problem):
+    cls = os.system("cls")
+    if default_user=="":
+        print("你还未登录！")
+        pause = os.system("pause")
+        return
+    url = "https://gmoj.net/senior/index.php/contest/show/" + id+"/"+problem
+    r = requests.get(url, cookies=cookies, headers=headers)
+    b = BeautifulSoup(r.text,"html.parser")
+    b.find(class_="navbar").extract()
+    title = b.find("h4")
+    if title!="<h4>(Standard IO)</h4>":
+        title = b.find("h4").find("span").string
+        title = title[0:title.find('.')]
+    else: title = id
+    folder = os.path.exists("data\\"+id+"\\"+title)
+    if not folder:
+        os.makedirs("data\\"+id+"\\"+title)
+    folder = os.path.exists(id+"\\"+title)
+    if not folder:
+        os.makedirs(id+"\\"+title)
+    if b.find(style="margin-top: 4px") == None or b.find(style="margin-top: 4px").string=="Submit":
+        get_match_html(b, id+"\\"+title+"\\"+title)
+    else:
+        get_markdown(b, id+"\\"+title+"\\"+title)
 
 
 def get_match():
     url = "https://gmoj.net/senior/index.php/contest/"
     cls = os.system("cls")
+    if default_user=="":
+        print("你还未登录！")
+        pause = os.system("pause")
+        return
     id = input("请输入比赛id：")
-    problem_url = url + "problems/" + id
-    r = requests.get(problem_url, headers=headers, cookies=cookies)
-    b = BeautifulSoup(r.text)
+    list_url = url + "problems/" + id
+    r = requests.get(list_url, headers=headers, cookies=cookies)
+    b = BeautifulSoup(r.text,"html.parser")
+    folder = os.path.exists(id)
+    if not folder:
+        os.makedirs(id)
+    folder = os.path.exists("data\\"+id)
+    if not folder:
+        os.makedirs("data\\"+id)
     for i in b.find_all("a"):
         i.extract()
     for i in b.find_all("td"):
-        print(i.string)
+        if i.string != None:
+            get_match_problem(id,i.string)
     pause = os.system("pause")
 
 
 def main():
-    cls = os.system("cls")
     init()
+    cls = os.system("cls")
     i = 1
     while 1:
         print("----ghelper----")
         print("用户：%s" % ("未登录" if (default_user == "") else default_user))
-        print("%c1.打开主页" % (">" if i == 1 else " "))
-        print("%c2.搜索题号" % (">" if i == 2 else " "))
-        print("%c3.搜索题目" % (">" if i == 3 else " "))
-        print("%c4.搜索用户" % (">" if i == 4 else " "))
-        print("%c5.用户管理（登录）" % (">" if i == 5 else " "))
-        print("%c6.题目下载" % (">" if i == 6 else " "))
-        print("%c7.比赛爬取" % (">" if i == 7 else " "))
-        print("%c8.退出" % (">" if i == 8 else " "))
+        print("%c1.用户管理（登录）" % (">" if i == 1 else " "))
+        print("%c2.题目下载" % (">" if i == 2 else " "))
+        print("%c3.比赛爬取" % (">" if i == 3 else " "))
+        print("%c4.退出" % (">" if i == 4 else " "))
         x = msvcrt.getch()
         if x == b"w" and i > 1:
             i -= 1
@@ -363,18 +409,10 @@ def main():
             i += 1
         elif x == b"\r":
             if i == 1:
-                main()
-            elif i == 2:
-                number()
-            elif i == 3:
-                topic()
-            elif i == 4:
-                user()
-            elif i == 5:
                 login()
-            elif i == 6:
+            elif i == 2:
                 get_problem()
-            elif i == 7:
+            elif i == 3:
                 get_match()
             else:
                 break
