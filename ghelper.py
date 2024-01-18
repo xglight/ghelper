@@ -217,7 +217,7 @@ def create_user():  # 创建用户
     reply = easygui.multpasswordbox(
         "创建用户", title="ghelper", fields=["用户名：", "密码："], values=["", ""]
     )
-    if reply == None or reply.count() < 2:
+    if reply == None or len(reply) < 2:
         return
     username = reply[0]
     password = reply[1]
