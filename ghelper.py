@@ -4,8 +4,6 @@ import requests
 import json
 from bs4 import BeautifulSoup
 import pdfkit
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
 import easygui
 import sys
 
@@ -16,6 +14,7 @@ default_user = ""
 codes = []
 default_code = ""
 delimiter = "\\" if sys.platform[0] == "w" else "/" # 根据系统类型判断
+exe_path = ""
 
 
 def init():  # 预处理json
@@ -292,12 +291,12 @@ def change_password():
 def html_to_pdf(html, to_file):  # html转pdf
     if sys.platform()[0] == "w":
         path_wkthmltopdf = (
-            r"D:\\LRK\\python\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"  # 需外挂wkhtmltopdf.exe
+            exe_path + r"\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"  # 需外挂wkhtmltopdf.exe
         )
         config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
         pdfkit.from_file(html, to_file, configuration=config)
     else:
-        pdfkit.from_file(html, to_file); # configuration=config)
+        pdfkit.from_file(html, to_file); # sudo apt install 需外挂wkhtmltopdf
 
 
 def get_html(b, id, path):  # 获取题目题面html
@@ -594,6 +593,8 @@ def delete_code():
 
 
 def main():
+    global exe_path
+    exe_path = os.path.dirname(os.path.abspath(__file__))
     init()
     while 1:
         choices = ["1.用户管理（登录）", "2.题目下载", "3.比赛获取", "4.用户信息获取", "5.代码模版管理"]
