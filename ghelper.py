@@ -1,12 +1,9 @@
-import msvcrt
 import os
 import base64
 import requests
 import json
 from bs4 import BeautifulSoup
 import pdfkit
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
 import easygui
 
 url = "https://gmoj.net/senior"
