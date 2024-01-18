@@ -5,6 +5,7 @@ import json
 from bs4 import BeautifulSoup
 import pdfkit
 import easygui
+import sys
 
 url = "https://gmoj.net/senior"
 js = {}
@@ -12,6 +13,7 @@ users = []
 default_user = ""
 codes = []
 default_code = ""
+delimiter = "\\" if sys.platform[0] == "w" else "/" # 根据系统类型判断
 exe_path = ""
 
 
@@ -86,14 +88,15 @@ def get_user():
         r = requests.get(get_url, cookies=cookies, headers=headers, timeout=1)
     except TimeoutError:  # 超时
         easygui.msgbox("timeout", title="ghelper")
-        # pause = os.system("pause")
         return -1
     except:  # 其他错误
         easygui.msgbox("login error", title="ghelper")
-        # pause = os.system("pause")
         return -1
     b = BeautifulSoup(r.text, "html.parser")
     user = b.find(class_="dl-horizontal")
+    if user == None:
+        easygui.msgbox("用户不存在", title="ghelper")
+        return
     project = ["用户名：", "uid:", "排名：", "AC 题目数：", "通过数：", "提交数：", "通过率：", "签名:"]
     information = {
         "用户名：": user.find(class_="label label-info").string,
@@ -103,15 +106,15 @@ def get_user():
         information.update({project[j]: i.string})
         j += 1
     information.update({project[j]: user.find("i").string})
-    with open("data\\" + reply + ".txt", "a+", encoding="utf-8") as f:
+    with open("data" + delimiter + reply + ".txt", "a+", encoding="utf-8") as f:
         f.truncate(0)
     for i in range(0, 8):
-        with open("data\\" + reply + ".txt", "a", encoding="utf-8") as f:
+        with open("data"+ delimiter + reply + ".txt", "a", encoding="utf-8") as f:
             f.write(project[i])
             f.write(information[project[i]])
             f.write("\n")
     text = ""
-    with open("data\\" + reply + ".txt", "r", encoding="utf-8") as f:
+    with open("data" + delimiter + reply + ".txt", "r", encoding="utf-8") as f:
         text = f.read()
     easygui.textbox("用户：" + reply, title="ghelper", text=text)
 
@@ -122,11 +125,9 @@ def gmoj_login(username, password):  # 发送登录请求
         r = requests.get(geturl, headers=headers, timeout=1)
     except TimeoutError:  # 超时
         easygui.msgbox("timeout", title="ghelper")
-        # pause = os.system("pause")
         return -1
     except:  # 其他错误
         easygui.msgbox("login error", title="ghelper")
-        # pause = os.system("pause")
         return -1
     global cookies
     cookies = r.cookies  # 获取cookies，用于之后登录（cookies可保存登录状态）
@@ -164,14 +165,15 @@ def login():  # 登录
 
 
 def choose_user():  # 选择用户登录
+    if len(js["users"]) == 0:
+        easygui.msgbox("无用户！", title="ghelper")
+        return
     i = 0
     global default_user
     while 1:
         choices = js["users"]
         reply = ""
-        if len(choices) == 0:
-            easygui.msgbox("无用户！", title="ghelper")
-        elif len(choices) == 1:
+        if len(choices) == 1:
             reply = easygui.ynbox(
                 msg="选择：(y/n)"
                 + str(choices)[
@@ -202,11 +204,9 @@ def choose_user():  # 选择用户登录
         if sit == 1:
             easygui.msgbox("成功！", title="ghelper")
             default_user = users[i]
-            # pause = os.system("pause")
         elif sit == 0:
             easygui.msgbox("该用户账号和密码不匹配！", title="ghelper")
             f = 0
-            # pause = os.system("pause")
         return f
 
 
@@ -232,11 +232,9 @@ def create_user():  # 创建用户
         with open("user.json", "w+", encoding="utf-8") as f:
             json.dump(js, f, indent=4, ensure_ascii=False)
         init()
-        # pause = os.system("pause")
     elif sit == 0:
         easygui.msgbox("失败！", "ghelper")
         f = 0
-        # pause = os.system("pause")
     else:  # 未知错误
         f = 0
     return f
@@ -291,17 +289,20 @@ def change_password():
 
 # TODO:exe
 def html_to_pdf(html, to_file):  # html转pdf
-    path_wkthmltopdf = (
-        exe_path + r"\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"  # 需外挂wkhtmltopdf.exe
-    )
-    config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
-    pdfkit.from_file(html, to_file, configuration=config)
+    if sys.platform()[0] == "w":
+        path_wkthmltopdf = (
+            exe_path + r"\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"  # 需外挂wkhtmltopdf.exe
+        )
+        config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
+        pdfkit.from_file(html, to_file, configuration=config)
+    else:
+        pdfkit.from_file(html, to_file); # sudo apt install 需外挂wkhtmltopdf
 
 
 def get_html(b, id, path):  # 获取题目题面html
     for i in b.find_all(class_="btn btn-mini btn_copy"):
         i.decompose()  # 排除不需要内容
-    with open("data\\" + id + ".html", "w+", encoding="utf-8") as f:
+    with open("data" + delimiter + id + ".html", "w+", encoding="utf-8") as f:
         f.write("<head>\n")
         f.write('  <meta charset="utf-8">\n')
         f.write("</head>\n")  # 写入编码
@@ -309,32 +310,28 @@ def get_html(b, id, path):  # 获取题目题面html
         f.write(str(b.find(id="problem_show_container").find(class_="span9")))
         f.write(str(b.style))
         f.write(str(b.find(type="text/javascript")))
-    html_to_pdf("data\\" + id + ".html", path + id + ".pdf")  # 转换pdf
+    html_to_pdf("data" + delimiter + id + ".html", path + id + ".pdf")  # 转换pdf
 
 
 def get_match_html(b, id):  # 获取比赛题目题面
     for i in b.find_all(class_="btn btn-mini btn_copy"):
         i.decompose()
-    with open("data\\" + id + ".html", "w+", encoding="utf-8") as f:
+    with open("data" + delimiter + id + ".html", "w+", encoding="utf-8") as f:
         f.write("<head>\n")
         f.write('  <meta charset="utf-8">\n')
         f.write("</head>\n")
         f.write(str(b))
-    html_to_pdf("data\\" + id + ".html", id + ".pdf")
+    html_to_pdf("data" + delimiter + id + ".html", id + ".pdf")
 
 
 # TODO:get_markdown
 def get_markdown(b, id):  # 获取markdown题面
-    cls = os.system("cls")
     print("抱歉，markdown采集正在研发中...")
-    # pause = os.system("pause")
 
 
 def get_problem():  # 获取题目
-    cls = os.system("cls")
     if default_user == "":
         easygui.msgbox("你还未登录！", title="ghelper")
-        # pause = os.system("pause")
         return
     id = easygui.enterbox(
         "题目id：",
@@ -358,18 +355,17 @@ def get_problem():  # 获取题目
     folder = os.path.exists(title)
     if not folder:
         os.makedirs(title)
-    with open(title + "\\" + id + ".cpp", "w+", encoding="utf-8") as f:
+    with open(title + delimiter + id + ".cpp", "w+", encoding="utf-8") as f:
         if default_code != "":
             f.write(base64_decry(js["codes"][default_code]["code"]))
     # 分析需不需freopen，若需，获取文件名
     if b.find(style="margin-top: 4px") == None:  # 判断是否为markdown
-        get_html(b, title, title + "\\")
+        get_html(b, title, title + delimiter)
     else:
         get_markdown(b, title)
 
 
 def get_match_problem(id, problem):  # 获取比赛题面
-    cls = os.system("cls")
     if default_user == "":
         easygui.msgbox("你还未登录！", title="ghelper")
         return
@@ -383,22 +379,22 @@ def get_match_problem(id, problem):  # 获取比赛题面
         title = title[0 : title.find(".")]
     else:
         title = id
-    folder = os.path.exists("data\\" + id + "\\" + title)
+    folder = os.path.exists("data" + delimiter + id + delimiter + title)
     if not folder:
-        os.makedirs("data\\" + id + "\\" + title)
-    folder = os.path.exists(id + "\\" + title)
+        os.makedirs("data" + delimiter + id + delimiter + title)
+    folder = os.path.exists(id + delimiter + title)
     if not folder:
-        os.makedirs(id + "\\" + title)
-    with open(id + "\\" + title + "\\" + title + ".cpp", "w+", encoding="utf-8") as f:
+        os.makedirs(id + delimiter + title)
+    with open(id + delimiter + title + delimiter + title + ".cpp", "w+", encoding="utf-8") as f:
         if default_code != "":
             f.write(base64_decry(js["codes"][default_code]["code"]))
     if (
         b.find(style="margin-top: 4px") == None
         or b.find(style="margin-top: 4px").string == "Submit"
     ):
-        get_match_html(b, id + "\\" + title + "\\" + title)
+        get_match_html(b, id + delimiter + title + delimiter + title)
     else:
-        get_markdown(b, id + "\\" + title + "\\" + title)
+        get_markdown(b, id + delimiter + title + delimiter + title)
 
 
 def get_match():  # 获取比赛
@@ -418,9 +414,9 @@ def get_match():  # 获取比赛
     folder = os.path.exists(id)
     if not folder:
         os.makedirs(id)
-    folder = os.path.exists("data\\" + id)
+    folder = os.path.exists("data" + delimiter + id)
     if not folder:
-        os.makedirs("data\\" + id)
+        os.makedirs("data" + delimiter + id)
     for i in b.find_all("a"):
         i.extract()
     for i in b.find_all("td"):
@@ -462,21 +458,22 @@ def submit_problem():  # 题目提交
 
 def code():
     choices = ["1.新建代码模版", "2.选择默认代码模版", "3.查看（更改）代码模版", "4.删除代码模版"]
-    reply = easygui.choicebox(
-        "当前代码模版：%s" % (("无") if (default_code == "") else default_code),
-        title="ghelper",
-        choices=choices,
-    )
-    if reply == choices[0]:
-        create_code()
-    elif reply == choices[1]:
-        choose_code()
-    elif reply == choices[2]:
-        watch_code()
-    elif reply == choices[3]:
-        delete_code()
-    else:
-        return
+    while 1:
+        reply = easygui.choicebox(
+            "当前代码模版：%s" % ("无" if (default_code == "") else default_code),
+            title="ghelper",
+            choices=choices,
+        )
+        if reply == choices[0]:
+            create_code()
+        elif reply == choices[1]:
+            choose_code()
+        elif reply == choices[2]:
+            watch_code()
+        elif reply == choices[3]:
+            delete_code()
+        else:
+            return
 
 
 def code_choose():
@@ -521,7 +518,7 @@ def create_code():
         return
     reply = easygui.buttonbox("选择写入方式：", title="ghelper", choices=choices)
     if reply == choices[0]:
-        path = easygui.fileopenbox("选择文件", title="ghelper", default="D:\\")
+        path = easygui.fileopenbox("选择文件", title="ghelper", default="D:" + delimiter)
         if path != None:
             with open(path, "r", encoding="utf-8") as f:
                 t = f.read()
@@ -563,6 +560,8 @@ def watch_code():
             return
         code = base64_decry(js["codes"][codes[i]]["code"])
         reply = easygui.codebox("代码模版：" + codes[i], title="ghelper", text=code)
+        if reply == None:
+            return
         new_code = {
             "codes": {
                 codes[i]: {
@@ -578,12 +577,16 @@ def watch_code():
 
 
 def delete_code():
+    global default_code
     i = 0
     while 1:
         i = code_choose()
         if i == -1:
             return
         js["codes"].pop(codes[i])
+        if len(js["codes"]) == 0:
+            default_code = ""
+            return
         with open("user.json", "w+", encoding="utf-8") as f:
             json.dump(js, f, indent=4, ensure_ascii=False)
         return
