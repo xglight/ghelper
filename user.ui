@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="7" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_8">
+      <property name="text">
+       <string>Rate:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="0" colspan="2">
+     <widget class="HyperlinkButton" name="HyperlinkButton">
+      <property name="maximumSize">
+       <size>
+        <width>200</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Hyperlink button</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_7">
+      <property name="text">
+       <string>Submit:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0" rowspan="5" colspan="2">
+     <widget class="AvatarWidget" name="AvatarWidget">
+      <property name="minimumSize">
+       <size>
+        <width>200</width>
+        <height>200</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_4">
+      <property name="text">
+       <string>Rank:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="3">
+     <widget class="SubtitleLabel" name="Rank">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_3">
+      <property name="text">
+       <string>Username:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="3">
+     <widget class="SubtitleLabel" name="AC_Problems">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="3">
+     <widget class="SubtitleLabel" name="Submit">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="3">
+     <widget class="SubtitleLabel" name="Solved">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_6">
+      <property name="text">
+       <string>Solved:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="7" column="3">
+     <widget class="SubtitleLabel" name="Rate">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_2">
+      <property name="text">
+       <string>uid:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_5">
+      <property name="text">
+       <string>AC Problems:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="SubtitleLabel" name="SubtitleLabel">
+      <property name="maximumSize">
+       <size>
+        <width>100</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>用户：</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1" colspan="3">
+     <widget class="StrongBodyLabel" name="user">
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="3">
+     <widget class="SubtitleLabel" name="uid">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="3">
+     <widget class="SubtitleLabel" name="Username">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+    <item row="8" column="2">
+     <widget class="SubtitleLabel" name="SubtitleLabel_9">
+      <property name="text">
+       <string>Description:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="8" column="3">
+     <widget class="SubtitleLabel" name="Description">
+      <property name="text">
+       <string>Subtitle label</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>900</width>
+     <height>19</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>HyperlinkButton</class>
+   <extends>PushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PushButton</class>
+   <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>StrongBodyLabel</class>
+   <extends>QLabel</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>SubtitleLabel</class>
+   <extends>QLabel</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>ImageLabel</class>
+   <extends>QLabel</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>AvatarWidget</class>
+   <extends>ImageLabel</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
