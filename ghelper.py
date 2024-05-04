@@ -10,6 +10,73 @@ from PyQt5.QtGui import *
 from Ui_home import Ui_home
 from Ui_user import Ui_user
 from Ui_login import Ui_login
+import requests
+from bs4 import *
+import base64
+import os
+
+
+def base64Encry(plaintext):  # base64加密
+    base64Encry = str(base64.b64encode(plaintext.encode("utf-8")))
+    return base64Encry[base64Encry.find("'") + 1 : len(base64Encry) - 1]
+
+
+def base64Decry(ciphertext):  # base64解密
+    base64Decry = (base64.b64decode(ciphertext)).decode("utf-8")
+    return str(base64Decry)
+
+
+def load_json():
+    global username, passowrd, js
+    js = {"user": {"username": "", "password": ""}}
+    if not os.path.exists("config"):
+        os.mkdir("config")
+    if os.path.exists(config_path) == 0 or os.path.getsize(config_path) == 0:
+        with open(config_path, "w+", encoding="utf-8") as f:
+            json.dump(js, f, indent=4, ensure_ascii=False)
+        return 0
+    with open("config/config.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+    with open(config_path, "r", encoding="utf-8") as f:
+        js = json.load(f)
+    username = base64Decry(js["user"]["username"])
+    password = base64Decry(js["user"]["password"])
+
+
+config_path = "config/config.json"
+js = ""
+username = ""
+passowrd = ""
+headers = {  # 请求头
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+}
+cookies = ""
+
+
+def login(username, password):  # 发送登录请求
+    global cookies
+    geturl = "https://gmoj.net/junior/index.php/main/home"  # 主地址（获取秘钥）
+    r = requests.get(geturl, headers=headers, timeout=1)
+    cookies = r.cookies  # 获取cookies，用于之后登录（cookies可保存登录状态）
+    cookies = requests.utils.dict_from_cookiejar(cookies)  # cookies格式化
+    b = BeautifulSoup(r.text, "html.parser")  # 用bs4处理get的信息
+    if str(b) == "None":
+        return -1
+    secretkey = b.find("script").text  # 获取秘钥
+    prekey = secretkey[secretkey.find("saltl") + 7 : secretkey.find(";") - 1]
+    lastkey = secretkey[
+        secretkey.find("saltr") + 7 : secretkey.find(";", secretkey.find("saltr")) - 1
+    ]  # 制作密文
+    posturl = "https://gmoj.net/senior/index.php/main/login"  # post登录地址
+    postdata = {
+        "username": username,
+        "password": prekey + password + lastkey,
+    }  # post数据
+    # print(postdata)
+    pr = requests.post(
+        posturl, cookies=cookies, headers=headers, data=postdata
+    )  # 发送post登录请求
+    return pr.text == "success"  # 判断是否成功
 
 
 class Config(QConfig):
@@ -144,7 +211,34 @@ class Login(QMainWindow, Ui_login):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         self.setupUi(self)
+        self.password.returnPressed.connect(self.cPassword)
         self.setObjectName(text.replace("", "-"))
+
+    def cPassword(self):
+        global username, password
+        _username = str(self.username.text())
+        _password = str(self.password.text())
+        if login(_username, _password):
+            username = _username
+            password = _password
+            js["user"]["username"] = base64Encry(username)
+            js["user"]["password"] = base64Encry(password)
+            with open(config_path, "w+", encoding="utf-8") as f:
+                json.dump(js, f, indent=4, ensure_ascii=False)
+            self.username.setText("")
+            self.password.setText("")
+            self.login_success(username)
+
+    def login_success(self, username):
+        InfoBar.success(
+            title="成功",
+            content=f"用户 {username} 已登录！",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
 
 
 class Window(FluentWindow):
@@ -190,6 +284,7 @@ class Window(FluentWindow):
 
 
 if __name__ == "__main__":
+    load_json()
     cfg = Config()
     qconfig.load("config/config.json", cfg)
     app = QApplication(sys.argv)
