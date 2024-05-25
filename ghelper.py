@@ -27,7 +27,7 @@ def base64Decry(ciphertext):  # base64解密
 
 
 def load_json():
-    global username, passowrd, js
+    global username, password, js
     js = {"user": {"username": "", "password": ""}}
     if not os.path.exists("config"):
         os.mkdir("config")
@@ -35,18 +35,19 @@ def load_json():
         with open(config_path, "w+", encoding="utf-8") as f:
             json.dump(js, f, indent=4, ensure_ascii=False)
         return 0
-    with open("config/config.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
     with open(config_path, "r", encoding="utf-8") as f:
         js = json.load(f)
     username = base64Decry(js["user"]["username"])
     password = base64Decry(js["user"]["password"])
+    if login(username, password) == 0:
+        username = password = ""
+
 
 
 config_path = "config/config.json"
 js = ""
 username = ""
-passowrd = ""
+password = ""
 headers = {  # 请求头
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
 }
@@ -114,10 +115,9 @@ class Home(QMainWindow, Ui_home):
         # 必须给子界面设置全局唯一的对象名
         self.setObjectName(text.replace(" ", "-"))
 
+name = ""
 
-class User(QMainWindow, Ui_user):
-    username = ""
-
+class User(QMainWindow, Ui_user):   
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         self.setupUi(self)
@@ -125,11 +125,85 @@ class User(QMainWindow, Ui_user):
         self.Search_user.searchSignal.connect(self.cSearch_user)
         self.Search_user.returnPressed.connect(self.cSearch_user)
         self.setObjectName(text.replace(" ", "-"))
+        global name
+        if name == "":
+            name = username
+        # print(name)
+        self.work()
 
     def cSearch_user(self):
-        if str(self.Search_user.text()) != "":
-            global username
-            username = str(self.Search_user.text())
+        global name
+        name = str(self.Search_user.text())
+        self.work()
+
+    def work(self):
+        global name
+        url = "https://gmoj.net/senior/index.php/users/"+name
+        try:
+            r = requests.get(url, headers=headers, cookies=cookies)
+        except:
+            return -1
+        b = BeautifulSoup(r.text,'html.parser')
+        with open("test.html","w+",encoding='utf-8') as f:
+            f.write(str(b))
+        if b.find("p") != None:
+            self.find_error()
+            return -1
+        # init
+        self.Description.setText("")
+        # Blog
+        if b.find(class_="btn btn-small btn-info") != None:
+            self.Link_blog.show()
+            self.Link_blog.setText("Blog")
+            self.Link_blog.setUrl(b.find(class_="btn btn-small btn-info")["href"])
+        else:
+            self.Link_blog.hide()
+        # Avatar
+        data = b.find("img")["src"]
+        if data == "":
+            self.Avatar.setImage("default_avatar.png")
+        else:
+            r = requests.get(data,headers=headers)
+            if r.status_code != 200:
+                self.Avatar.setImage("default_avatar.png")
+            else:
+                with open(str(cfg.get(cfg.cacheFolder))+'/'+str(name)+"_avator.png","wb") as f:
+                    f.write(r.content)
+                self.Avatar.setImage(cfg.get(cfg.cacheFolder)+'/'+name+"_avator.png")
+        self.Avatar.setBorderRadius(8,8,8,8)
+        self.Avatar.scaledToHeight(255)
+        # info
+        data = b.find_all("dd")
+        j = 1
+        for i in data:
+            if j == 1:
+                self.uid.setText(i.span.text)
+            elif j==2:
+                self.Username.setText(i.span.text)
+            elif j == 3:
+                self.Rank.setText(i.span.text)
+            elif j == 4:
+                self.AC_problems.setText(i.a.span.text)
+            elif j == 5:
+                self.Solve.setText(i.a.span.text)
+            elif j == 6:
+                self.Submit.setText(i.a.span.text)
+            elif j == 7:
+                self.Rate.setText(i.span.text)
+            else:
+                self.Description.setText(i.text)
+            j+=1
+    def find_error(self):
+        InfoBar.error(
+            title="失败",
+            content=f"未找到用户",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
+
 
 
 class SettingInterface(ScrollArea):
@@ -212,14 +286,15 @@ class Login(QMainWindow, Ui_login):
         super().__init__(parent=parent)
         self.setupUi(self)
         self.password.returnPressed.connect(self.cPassword)
+        self.login.clicked.connect(self.cPassword)
         self.setObjectName(text.replace("", "-"))
 
     def cPassword(self):
         global username, password
-        _username = str(self.username.text())
+        name = str(self.username.text())
         _password = str(self.password.text())
-        if login(_username, _password):
-            username = _username
+        if login(name, _password):
+            username = name
             password = _password
             js["user"]["username"] = base64Encry(username)
             js["user"]["password"] = base64Encry(password)
@@ -228,11 +303,24 @@ class Login(QMainWindow, Ui_login):
             self.username.setText("")
             self.password.setText("")
             self.login_success(username)
+        else:
+            self.login_error()
 
     def login_success(self, username):
         InfoBar.success(
             title="成功",
             content=f"用户 {username} 已登录！",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
+
+    def login_error(self):
+        InfoBar.error(
+            title="失败",
+            content=f"用户名与密码不匹配！",
             orient=Qt.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
