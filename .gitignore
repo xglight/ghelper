@@ -2,4 +2,5 @@ __pycache__
 cache
 download
 config
+other
 *.code-workspace
