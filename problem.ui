@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>problem</class>
+ <widget class="QMainWindow" name="problem">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="2" column="3" colspan="2">
+     <widget class="TransparentPushButton" name="Jump_down">
+      <property name="maximumSize">
+       <size>
+        <width>100</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>下一页</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="3">
+     <widget class="PrimaryPushButton" name="Choose_all">
+      <property name="text">
+       <string>全选</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="5">
+     <widget class="PrimaryPushButton" name="Problem_download">
+      <property name="text">
+       <string>下载</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0" colspan="3">
+     <widget class="SearchLineEdit" name="Search_problem"/>
+    </item>
+    <item row="2" column="2">
+     <widget class="CompactSpinBox" name="Jump_page"/>
+    </item>
+    <item row="2" column="6">
+     <widget class="ProgressBar" name="ProgressBar">
+      <property name="maximumSize">
+       <size>
+        <width>350</width>
+        <height>4</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="TransparentPushButton" name="Jump_up">
+      <property name="text">
+       <string>上一页</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="TransparentPushButton" name="Jump">
+      <property name="text">
+       <string>跳转</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="4">
+     <widget class="PrimaryPushButton" name="Choose_reverse">
+      <property name="text">
+       <string>反选</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0" colspan="7">
+     <widget class="QTableWidget" name="Problem"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>900</width>
+     <height>21</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PushButton</class>
+   <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PrimaryPushButton</class>
+   <extends>PushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>TransparentPushButton</class>
+   <extends>PushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>ProgressBar</class>
+   <extends>QProgressBar</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>LineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>SearchLineEdit</class>
+   <extends>LineEdit</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>CompactSpinBox</class>
+   <extends>QSpinBox</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

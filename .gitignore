@@ -4,3 +4,4 @@ download
 config
 other
 *.code-workspace
+*.html

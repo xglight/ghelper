@@ -10,6 +10,7 @@ from PyQt5.QtGui import *
 from Ui_home import Ui_home
 from Ui_user import Ui_user
 from Ui_login import Ui_login
+from Ui_problem import Ui_problem
 import requests
 from bs4 import *
 import base64
@@ -27,7 +28,7 @@ def base64Decry(ciphertext):  # base64解密
 
 
 def load_json():
-    global username, password, js
+    global username, password, js,login_success
     js = {"user": {"username": "", "password": ""}}
     if not os.path.exists("config"):
         os.mkdir("config")
@@ -41,6 +42,8 @@ def load_json():
     password = base64Decry(js["user"]["password"])
     if login(username, password) == 0:
         username = password = ""
+    else: 
+        login_success = True
 
 
 
@@ -52,7 +55,7 @@ headers = {  # 请求头
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
 }
 cookies = ""
-
+login_success = False
 
 def login(username, password):  # 发送登录请求
     global cookies
@@ -121,6 +124,8 @@ class User(QMainWindow, Ui_user):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         self.setupUi(self)
+        if login_success == False:
+            self.login_error()
         self.Search_user.setPlaceholderText("输入用户名")
         self.Search_user.searchSignal.connect(self.cSearch_user)
         self.Search_user.returnPressed.connect(self.cSearch_user)
@@ -128,7 +133,6 @@ class User(QMainWindow, Ui_user):
         global name
         if name == "":
             name = username
-        # print(name)
         self.work()
 
     def cSearch_user(self):
@@ -144,11 +148,10 @@ class User(QMainWindow, Ui_user):
         except:
             return -1
         b = BeautifulSoup(r.text,'html.parser')
-        with open("test.html","w+",encoding='utf-8') as f:
-            f.write(str(b))
         if b.find("p") != None:
             self.find_error()
             return -1
+        self.find_success()
         # init
         self.Description.setText("")
         # Blog
@@ -203,8 +206,25 @@ class User(QMainWindow, Ui_user):
             duration=2000,
             parent=self,
         )
-
-
+    def find_success(self):
+        InfoBar.success(
+            title="成功",
+            content=f"用户 {name} 已找到！",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP_RIGHT,
+            duration=2000,
+            parent=self,
+        )
+    def login_error(self):
+        InfoBar.error(
+            title="错误",
+            content=f"请先登录！",
+            orient=Qt.Horizontal,
+            position=InfoBarPosition.BOTTOM_RIGHT,
+            duration=-1,
+            parent=self,
+        )
 
 class SettingInterface(ScrollArea):
     def __init__(self, parent=None):
@@ -280,6 +300,133 @@ class Setting(QMainWindow):
         self.resize(900, 600)
         self.setObjectName(text.replace(" ", "-"))
 
+class Problem(QMainWindow, Ui_problem):
+    lastpage = 0
+    page = 0
+    search = ""
+    Problem = []
+    def __init__(self, text: str, parent=None):
+        super().__init__(parent=parent)
+        self.setupUi(self)
+        if login_success == False:
+            self.login_error()
+        self.Search_problem.setPlaceholderText("搜索")
+        self.Search_problem.searchSignal.connect(self.search_problem) 
+        self.Search_problem.returnPressed.connect(self.search_problem)
+        self.Jump_up.clicked.connect(self.jump_up)
+        self.Jump_down.clicked.connect(self.jump_down)
+        self.setObjectName(text.replace(" ", "-"))
+    
+    def search_problem(self):
+        global cookies
+        global headers
+        Problem.search = str(self.Search_problem.text())
+        url = "https://gmoj.net/senior/index.php/main/problemset?search=" + Problem.search
+        try:
+            r = requests.get(url, headers=headers, cookies=cookies)
+        except:
+            return -1
+        b = BeautifulSoup(r.text, "html.parser")
+        with open("problem.html", "w", encoding="utf-8") as f:
+            f.write(str(b))
+        if str(b) == "None":
+            return -1
+        bb = str(b.find(class_="pagination pagination-small pagination-centered"))
+        if b.find("em"):
+            Problem.lastpage = 1
+        mi = 1
+        vis = 0
+        for i in bb[::-1]:
+            if "0" <= i and i <= "9":
+                Problem.lastpage += int(ord(i) - ord("0")) * mi
+                mi *= 10
+                vis = 1
+            elif vis:
+                if i == '"':
+                    break
+                else:
+                    vis = 0
+                    Problem.lastpage = 0
+                    mi = 1
+        if Problem.lastpage == 0:
+            return -1
+        Problem.page = 1
+        self.View_problem()
+    
+    def getPage(self):
+        global cookies
+        global headers
+        Problem.problem_set = []
+        url = "https://gmoj.net/senior/index.php/main/problemset/"+ str(Problem.page)+ "?search=" + Problem.search
+        try:
+            r = requests.get(url, headers=headers, cookies=cookies)
+        except:
+            return -1
+        b = BeautifulSoup(r.text, "html.parser").find(class_="problemset_table").table.tbody
+        for i in b.find_all(style="height:0px"):
+            Problem.problem_set.append(
+                {
+                    "pid": i.find(class_="pid").a.text,
+                    "title": i.find(class_="title").a.text,
+                    "source": i.find(class_="source").text,
+                    "solvedCount": i.find(class_="solvedCount").a.span.text,
+                    "submitCount": i.find(class_="submitCount").a.span.text,
+                    "avg": i.find(class_="avg").a.span.text,
+                }
+            )
+    
+    def View_problem(self):
+        self.getPage()
+        if len(Problem.problem_set) == 0:
+            return -1
+        self.Problem.setRowCount(0)
+        self.Problem.setColumnCount(0)
+        self.Problem.setRowCount(len(Problem.problem_set))
+        self.Problem.setColumnCount(7)
+        self.Problem.setHorizontalHeaderLabels(
+            ["选择", "pid", "题目名", "来源", "AC", "提交", "平均分"]
+        )
+        self.Problem.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.Problem.setSelectionMode(QAbstractItemView.NoSelection)
+        self.Problem.verticalHeader().setVisible(False)
+        self.Problem.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+        for i in range(len(Problem.problem_set)):
+            self.check = QTableWidgetItem()
+            self.check.setCheckState(Qt.Unchecked)  # 把checkBox设为未选中状态
+            self.Problem.setItem(i, 0, self.check)
+        for i in range(len(Problem.problem_set)):
+            self.Problem.setItem(i, 1, QTableWidgetItem(Problem.problem_set[i]["pid"]))
+        for i in range(len(Problem.problem_set)):
+            self.Problem.setItem(i, 2, QTableWidgetItem(Problem.problem_set[i]["title"]))
+        for i in range(len(Problem.problem_set)):
+            self.Problem.setItem(i, 3, QTableWidgetItem(Problem.problem_set[i]["source"]))
+        for i in range(len(Problem.problem_set)):
+            self.Problem.setItem(i, 4, QTableWidgetItem(Problem.problem_set[i]["solvedCount"]))
+        for i in range(len(Problem.problem_set)):
+            self.Problem.setItem(i, 5, QTableWidgetItem(Problem.problem_set[i]["submitCount"]))
+        for i in range(len(Problem.problem_set)):
+            self.Problem.setItem(i, 6, QTableWidgetItem(Problem.problem_set[i]["avg"]))
+
+    def jump_up(self):
+        if Problem.page > 1:
+            Problem.page -= 1
+            self.View_problem()
+
+    def jump_down(self):
+        if Problem.page < Problem.lastpage:
+            Problem.page += 1
+            self.View_problem()
+    def login_error(self):
+        InfoBar.error(
+            title="错误",
+            content=f"请先登录！",
+            orient=Qt.Horizontal,
+            position=InfoBarPosition.BOTTOM_RIGHT,
+            duration=-1,
+            parent=self,
+        )
 
 class Login(QMainWindow, Ui_login):
     def __init__(self, text: str, parent=None):
@@ -290,7 +437,7 @@ class Login(QMainWindow, Ui_login):
         self.setObjectName(text.replace("", "-"))
 
     def cPassword(self):
-        global username, password
+        global username, password,login_success
         name = str(self.username.text())
         _password = str(self.password.text())
         if login(name, _password):
@@ -303,6 +450,7 @@ class Login(QMainWindow, Ui_login):
             self.username.setText("")
             self.password.setText("")
             self.login_success(username)
+            login_success = True
         else:
             self.login_error()
 
@@ -337,7 +485,7 @@ class Window(FluentWindow):
         # 创建子界面，实际使用时将 Widget 换成自己的子界面
         self.homeInterface = Home("主页", self)
         self.userInterface = User("用户", self)
-        # self.problemInterface = Home('题目', self)
+        self.problemInterface = Problem('题目', self)
         self.settingInterface = Setting("设置", self)
         self.loginInterface = Login("登录", self)
         # self.contestInterface = Home('比赛', self)
@@ -355,9 +503,9 @@ class Window(FluentWindow):
         self.addSubInterface(self.loginInterface, FIF.VPN, "登录")
         self.addSubInterface(self.userInterface, FIF.ROBOT, "用户")
 
-        # self.navigationInterface.addSeparator()
+        self.navigationInterface.addSeparator()
 
-        # self.addSubInterface(self.problemInterface, FIF.LABEL, '题目')
+        self.addSubInterface(self.problemInterface, FIF.LABEL, '题目')
         # self.addSubInterface(self.contestInterface, FIF.CALENDAR, '比赛')
         # self.addSubInterface(self.submitInterface, FIF.SEND, '提交')
         # self.addSubInterface(self.rankInterface, FIF.BOOK_SHELF, '榜单')
