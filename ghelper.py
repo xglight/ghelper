@@ -19,7 +19,7 @@ import os
 
 def base64Encry(plaintext):  # base64加密
     base64Encry = str(base64.b64encode(plaintext.encode("utf-8")))
-    return base64Encry[base64Encry.find("'") + 1 : len(base64Encry) - 1]
+    return base64Encry[base64Encry.find("'") + 1: len(base64Encry) - 1]
 
 
 def base64Decry(ciphertext):  # base64解密
@@ -28,7 +28,7 @@ def base64Decry(ciphertext):  # base64解密
 
 
 def load_json():
-    global username, password, js,login_success
+    global username, password, js, login_success
     js = {"user": {"username": "", "password": ""}}
     if not os.path.exists("config"):
         os.mkdir("config")
@@ -42,9 +42,8 @@ def load_json():
     password = base64Decry(js["user"]["password"])
     if login(username, password) == 0:
         username = password = ""
-    else: 
+    else:
         login_success = True
-
 
 
 config_path = "config/config.json"
@@ -57,6 +56,7 @@ headers = {  # 请求头
 cookies = ""
 login_success = False
 
+
 def login(username, password):  # 发送登录请求
     global cookies
     geturl = "https://gmoj.net/junior/index.php/main/home"  # 主地址（获取秘钥）
@@ -67,9 +67,9 @@ def login(username, password):  # 发送登录请求
     if str(b) == "None":
         return -1
     secretkey = b.find("script").text  # 获取秘钥
-    prekey = secretkey[secretkey.find("saltl") + 7 : secretkey.find(";") - 1]
+    prekey = secretkey[secretkey.find("saltl") + 7: secretkey.find(";") - 1]
     lastkey = secretkey[
-        secretkey.find("saltr") + 7 : secretkey.find(";", secretkey.find("saltr")) - 1
+        secretkey.find("saltr") + 7: secretkey.find(";", secretkey.find("saltr")) - 1
     ]  # 制作密文
     posturl = "https://gmoj.net/senior/index.php/main/login"  # post登录地址
     postdata = {
@@ -85,7 +85,8 @@ def login(username, password):  # 发送登录请求
 
 class Config(QConfig):
     # download
-    downloadFolder = ConfigItem("Folders", "Download", "download", FolderValidator())
+    downloadFolder = ConfigItem(
+        "Folders", "Download", "download", FolderValidator())
     cacheFolder = ConfigItem("Folders", "Cache", "cache", FolderValidator())
 
 
@@ -118,9 +119,11 @@ class Home(QMainWindow, Ui_home):
         # 必须给子界面设置全局唯一的对象名
         self.setObjectName(text.replace(" ", "-"))
 
+
 name = ""
 
-class User(QMainWindow, Ui_user):   
+
+class User(QMainWindow, Ui_user):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         self.setupUi(self)
@@ -147,7 +150,7 @@ class User(QMainWindow, Ui_user):
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
             return -1
-        b = BeautifulSoup(r.text,'html.parser')
+        b = BeautifulSoup(r.text, 'html.parser')
         if b.find("p") != None:
             self.find_error()
             return -1
@@ -158,7 +161,8 @@ class User(QMainWindow, Ui_user):
         if b.find(class_="btn btn-small btn-info") != None:
             self.Link_blog.show()
             self.Link_blog.setText("Blog")
-            self.Link_blog.setUrl(b.find(class_="btn btn-small btn-info")["href"])
+            self.Link_blog.setUrl(
+                b.find(class_="btn btn-small btn-info")["href"])
         else:
             self.Link_blog.hide()
         # Avatar
@@ -166,14 +170,15 @@ class User(QMainWindow, Ui_user):
         if data == "":
             self.Avatar.setImage("default_avatar.png")
         else:
-            r = requests.get(data,headers=headers)
+            r = requests.get(data, headers=headers)
             if r.status_code != 200:
                 self.Avatar.setImage("default_avatar.png")
             else:
-                with open(str(cfg.get(cfg.cacheFolder))+'/'+str(name)+"_avator.png","wb") as f:
+                with open(str(cfg.get(cfg.cacheFolder))+'/'+str(name)+"_avator.png", "wb") as f:
                     f.write(r.content)
-                self.Avatar.setImage(cfg.get(cfg.cacheFolder)+'/'+name+"_avator.png")
-        self.Avatar.setBorderRadius(8,8,8,8)
+                self.Avatar.setImage(
+                    cfg.get(cfg.cacheFolder)+'/'+name+"_avator.png")
+        self.Avatar.setBorderRadius(8, 8, 8, 8)
         self.Avatar.scaledToHeight(255)
         # info
         data = b.find_all("dd")
@@ -181,7 +186,7 @@ class User(QMainWindow, Ui_user):
         for i in data:
             if j == 1:
                 self.uid.setText(i.span.text)
-            elif j==2:
+            elif j == 2:
                 self.Username.setText(i.span.text)
             elif j == 3:
                 self.Rank.setText(i.span.text)
@@ -195,7 +200,8 @@ class User(QMainWindow, Ui_user):
                 self.Rate.setText(i.span.text)
             else:
                 self.Description.setText(i.text)
-            j+=1
+            j += 1
+
     def find_error(self):
         InfoBar.error(
             title="失败",
@@ -206,6 +212,7 @@ class User(QMainWindow, Ui_user):
             duration=2000,
             parent=self,
         )
+
     def find_success(self):
         InfoBar.success(
             title="成功",
@@ -216,6 +223,7 @@ class User(QMainWindow, Ui_user):
             duration=2000,
             parent=self,
         )
+
     def login_error(self):
         InfoBar.error(
             title="错误",
@@ -225,6 +233,7 @@ class User(QMainWindow, Ui_user):
             duration=-1,
             parent=self,
         )
+
 
 class SettingInterface(ScrollArea):
     def __init__(self, parent=None):
@@ -300,23 +309,29 @@ class Setting(QMainWindow):
         self.resize(900, 600)
         self.setObjectName(text.replace(" ", "-"))
 
+
 class Problem(QMainWindow, Ui_problem):
     lastpage = 0
     page = 0
     search = ""
     Problem = []
+
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
         self.setupUi(self)
         if login_success == False:
             self.login_error()
+        self.Problem.itemClicked.connect(self.check_problem)
         self.Search_problem.setPlaceholderText("搜索")
-        self.Search_problem.searchSignal.connect(self.search_problem) 
+        self.Search_problem.searchSignal.connect(self.search_problem)
         self.Search_problem.returnPressed.connect(self.search_problem)
+        self.Choose_all.clicked.connect(self.check_all)
+        self.Choose_reverse.clicked.connect(self.check_reverse)
         self.Jump_up.clicked.connect(self.jump_up)
         self.Jump_down.clicked.connect(self.jump_down)
         self.setObjectName(text.replace(" ", "-"))
-    
+        self.Problem.cellDoubleClicked.connect(self.open_problem)
+
     def search_problem(self):
         global cookies
         global headers
@@ -352,17 +367,19 @@ class Problem(QMainWindow, Ui_problem):
             return -1
         Problem.page = 1
         self.View_problem()
-    
+
     def getPage(self):
         global cookies
         global headers
         Problem.problem_set = []
-        url = "https://gmoj.net/senior/index.php/main/problemset/"+ str(Problem.page)+ "?search=" + Problem.search
+        url = "https://gmoj.net/senior/index.php/main/problemset/" + \
+            str(Problem.page) + "?search=" + Problem.search
         try:
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
             return -1
-        b = BeautifulSoup(r.text, "html.parser").find(class_="problemset_table").table.tbody
+        b = BeautifulSoup(r.text, "html.parser").find(
+            class_="problemset_table").table.tbody
         for i in b.find_all(style="height:0px"):
             Problem.problem_set.append(
                 {
@@ -374,7 +391,7 @@ class Problem(QMainWindow, Ui_problem):
                     "avg": i.find(class_="avg").a.span.text,
                 }
             )
-    
+
     def View_problem(self):
         self.getPage()
         if len(Problem.problem_set) == 0:
@@ -397,17 +414,30 @@ class Problem(QMainWindow, Ui_problem):
             self.check.setCheckState(Qt.Unchecked)  # 把checkBox设为未选中状态
             self.Problem.setItem(i, 0, self.check)
         for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 1, QTableWidgetItem(Problem.problem_set[i]["pid"]))
+            self.Problem.setItem(i, 1, QTableWidgetItem(
+                Problem.problem_set[i]["pid"]))
         for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 2, QTableWidgetItem(Problem.problem_set[i]["title"]))
+            self.Problem.setItem(i, 2, QTableWidgetItem(
+                Problem.problem_set[i]["title"]))
         for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 3, QTableWidgetItem(Problem.problem_set[i]["source"]))
+            self.Problem.setItem(i, 3, QTableWidgetItem(
+                Problem.problem_set[i]["source"]))
         for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 4, QTableWidgetItem(Problem.problem_set[i]["solvedCount"]))
+            self.Problem.setItem(i, 4, QTableWidgetItem(
+                Problem.problem_set[i]["solvedCount"]))
         for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 5, QTableWidgetItem(Problem.problem_set[i]["submitCount"]))
+            self.Problem.setItem(i, 5, QTableWidgetItem(
+                Problem.problem_set[i]["submitCount"]))
         for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 6, QTableWidgetItem(Problem.problem_set[i]["avg"]))
+            self.Problem.setItem(i, 6, QTableWidgetItem(
+                Problem.problem_set[i]["avg"]))
+
+    def check_problem(self, item):
+        h = item.row()
+        if self.Problem.item(h, 0).checkState() == Qt.Checked:
+            self.Problem.item(h, 0).setCheckState(Qt.Unchecked)
+        else:
+            self.Problem.item(h, 0).setCheckState(Qt.Checked)
 
     def jump_up(self):
         if Problem.page > 1:
@@ -418,6 +448,23 @@ class Problem(QMainWindow, Ui_problem):
         if Problem.page < Problem.lastpage:
             Problem.page += 1
             self.View_problem()
+
+    def check_all(self):
+        for i in range(self.Problem.rowCount()):
+            self.Problem.item(i, 0).setCheckState(Qt.Checked)
+
+    def check_reverse(self):
+        for i in range(self.Problem.rowCount()):
+            if self.Problem.item(i, 0).checkState() == Qt.Checked:
+                self.Problem.item(i, 0).setCheckState(Qt.Unchecked)
+            else:
+                self.Problem.item(i, 0).setCheckState(Qt.Checked)
+
+    def open_problem(self, row, column):
+        if column == 2:
+            pid = self.Problem.item(row, 1).text()
+            self.get_problem(pid)
+
     def login_error(self):
         InfoBar.error(
             title="错误",
@@ -428,6 +475,41 @@ class Problem(QMainWindow, Ui_problem):
             parent=self,
         )
 
+    def get_problem(self, id):
+        url = "https://gmoj.net/senior/index.php/main/show/" + id
+        try:
+            r = requests.get(url, headers=headers, cookies=cookies)
+        except:
+            return -1
+        b = BeautifulSoup(r.text, "html.parser")
+        if str(b) == "None" or b.find(style="white-space: pre-wrap") != None:
+            return -1
+        title = str(b.find("h4").string)
+        if title != "(Standard IO)":
+            title = b.find("h4").find("span").string
+            title = title[0: title.find(".")]
+        else:
+            title = id
+        if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)):
+            os.makedirs(cfg.cacheFolder.value + "\\" + str(id))
+        title = str(title)
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w", encoding="utf-8") as f:
+            f.write(str(b))
+        if b.find(id="problem_description") == None:  # 判断是否为markdown
+            self.problem_html(id)
+        # else:
+        #     getMarkdown(b, str(title), str(title) + "/")
+
+    def problem_html(self, id):
+        b = ""
+        if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)+"\\" + str(id) + ".html"):
+            return -1
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "r", encoding="utf-8") as f:
+            f.read(b)
+        b = BeautifulSoup(b, "html.parser")
+        print(str(b))
+
+
 class Login(QMainWindow, Ui_login):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
@@ -437,7 +519,7 @@ class Login(QMainWindow, Ui_login):
         self.setObjectName(text.replace("", "-"))
 
     def cPassword(self):
-        global username, password,login_success
+        global username, password, login_success
         name = str(self.username.text())
         _password = str(self.password.text())
         if login(name, _password):
