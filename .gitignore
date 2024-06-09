@@ -6,3 +6,4 @@ other
 *.code-workspace
 *.html
 .vscode
+wkhtmltopdf

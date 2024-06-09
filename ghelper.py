@@ -15,6 +15,7 @@ import requests
 from bs4 import *
 import base64
 import os
+import pdfkit
 
 
 def base64Encry(plaintext):  # base64加密
@@ -32,11 +33,11 @@ def load_json():
     js = {"user": {"username": "", "password": ""}}
     if not os.path.exists("config"):
         os.mkdir("config")
-    if os.path.exists(config_path) == 0 or os.path.getsize(config_path) == 0:
-        with open(config_path, "w+", encoding="utf-8") as f:
+    if os.path.exists(user_path) == 0 or os.path.getsize(user_path) == 0:
+        with open(user_path, "w+", encoding="utf-8") as f:
             json.dump(js, f, indent=4, ensure_ascii=False)
         return 0
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(user_path, "r", encoding="utf-8") as f:
         js = json.load(f)
     username = base64Decry(js["user"]["username"])
     password = base64Decry(js["user"]["password"])
@@ -45,8 +46,35 @@ def load_json():
     else:
         login_success = True
 
+    environment_path = os.environ["PATH"]
+    path = ""
+    f = False
+    for i in environment_path:
+        if i == ";":
+            for i in os.listdir(path):
+                if i == "wkhtmltopdf.exe":
+                    cfg.set(cfg.wkhtmltopdf, path+"/")
+                    f = True
+                    break
+            if f == True:
+                break
+            path = ""
+        else:
+            path += i
+    if f == False:
+        cfg.set(cfg.wkhtmltopdf, "")
+
+def htmlToPdf(html, to_file):  # html转pdf
+    path_wkthmltopdf = (
+        cfg.wkhtmltopdf.value+"/" + r"wkhtmltopdf.exe"  # 需外挂wkhtmltopdf.exe + "/"
+    )
+    pdfkit_config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
+    pdfkit.from_file(html, to_file, configuration=pdfkit_config,
+                     options={"encoding": "utf-8"})
+
 
 config_path = "config/config.json"
+user_path = "config/user.json"
 js = ""
 username = ""
 password = ""
@@ -88,6 +116,8 @@ class Config(QConfig):
     downloadFolder = ConfigItem(
         "Folders", "Download", "download", FolderValidator())
     cacheFolder = ConfigItem("Folders", "Cache", "cache", FolderValidator())
+    wkhtmltopdf = ConfigItem(
+        "Folders", "Wkhtmltopdf", "wkhtmltopdf", FolderValidator())
 
 
 class Demo(FramelessWindow):
@@ -256,6 +286,13 @@ class SettingInterface(ScrollArea):
             cfg.get(cfg.cacheFolder),
             self.Download,
         )
+        self.wkhtmltopdf = PushSettingCard(
+            "选择文件夹",
+            FIF.DOWNLOAD,
+            "Wkhtmltopdf",
+            cfg.get(cfg.wkhtmltopdf),
+            self.Download,
+        )
         self.__initWidget()
 
     def __initWidget(self):
@@ -272,6 +309,7 @@ class SettingInterface(ScrollArea):
 
         self.Download.addSettingCard(self.download)
         self.Download.addSettingCard(self.cache)
+        self.Download.addSettingCard(self.wkhtmltopdf)
 
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(30, 10, 60, 0)
@@ -293,9 +331,45 @@ class SettingInterface(ScrollArea):
         cfg.set(cfg.cacheFolder, folder)
         self.cache.setContent(folder)
 
+    def cwkhtmltopdf(self):
+        folder = QFileDialog.getExistingDirectory(self, "选择文件夹", "./")
+        if not folder or cfg.get(cfg.wkhtmltopdf) == folder:
+            return
+        for i in os.listdir(folder):
+            if i.find("wkhtmltopdf.exe") != -1:
+                self.find_success()
+                cfg.set(cfg.wkhtmltopdf, folder)
+                self.wkhtmltopdf.setContent(folder)
+                return 1
+        self.find_error()
+        return -1
+
     def __connectSignalToSlot(self):
         self.download.clicked.connect(self.cdownload)
         self.cache.clicked.connect(self.ccache)
+        self.wkhtmltopdf.clicked.connect(self.cwkhtmltopdf)
+
+    def find_error(self):
+        InfoBar.error(
+            title="失败",
+            content=f"未找到可用的 wkhtmltopdf.exe",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
+
+    def find_success(self):
+        InfoBar.success(
+            title="成功",
+            content=f"wkhtmltopdf.exe 已就绪",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
 
 
 class Setting(QMainWindow):
@@ -463,7 +537,21 @@ class Problem(QMainWindow, Ui_problem):
     def open_problem(self, row, column):
         if column == 2:
             pid = self.Problem.item(row, 1).text()
-            self.get_problem(pid)
+            p = self.get_problem(pid)
+            if p != 1:
+                self.login_error()
+                return -1
+            
+    
+    def login_error(self):
+        InfoBar.error(
+            title="错误",
+            content=f"找不到题目！",
+            orient=Qt.Horizontal,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
 
     def login_error(self):
         InfoBar.error(
@@ -493,21 +581,39 @@ class Problem(QMainWindow, Ui_problem):
         if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)):
             os.makedirs(cfg.cacheFolder.value + "\\" + str(id))
         title = str(title)
-        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w", encoding="utf-8") as f:
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + "o_" + str(id) + ".html", "w", encoding="utf-8") as f:
             f.write(str(b))
         if b.find(id="problem_description") == None:  # 判断是否为markdown
-            self.problem_html(id)
-        # else:
+            if self.problem_html(id)== 1:
+                return 1
+        else:
+            print(-1)
         #     getMarkdown(b, str(title), str(title) + "/")
+        # TODO: 增加markdown渲染功能
 
     def problem_html(self, id):
         b = ""
+        if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
+            os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
         if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)+"\\" + str(id) + ".html"):
             return -1
-        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "r", encoding="utf-8") as f:
-            f.read(b)
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html", "r", encoding="utf-8") as f:
+            b = f.read()
         b = BeautifulSoup(b, "html.parser")
-        print(str(b))
+        for i in b.find_all(class_="btn btn-mini btn_copy"):
+            i.decompose()
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w+", encoding="utf-8") as f:
+            f.write("<head>\n")
+            f.write('  <meta charset="utf-8">\n')
+            f.write("</head>\n")  # 写入编码
+            f.write(str(b.find(class_="row-fluid")))
+            f.write(str(b.find(id="problem_show_container").find(class_="span9")))
+            f.write(str(b.style))
+            f.write(str(b.find(type="text/javascript")))
+        print(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html")
+        print(cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
+        htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
+        return 1
 
 
 class Login(QMainWindow, Ui_login):
@@ -527,7 +633,7 @@ class Login(QMainWindow, Ui_login):
             password = _password
             js["user"]["username"] = base64Encry(username)
             js["user"]["password"] = base64Encry(password)
-            with open(config_path, "w+", encoding="utf-8") as f:
+            with open(user_path, "w+", encoding="utf-8") as f:
                 json.dump(js, f, indent=4, ensure_ascii=False)
             self.username.setText("")
             self.password.setText("")
@@ -602,8 +708,8 @@ class Window(FluentWindow):
 
 
 if __name__ == "__main__":
-    load_json()
     cfg = Config()
+    load_json()
     qconfig.load("config/config.json", cfg)
     app = QApplication(sys.argv)
     # w=Demo()
