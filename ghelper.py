@@ -107,7 +107,6 @@ def login(username, password):  # 发送登录请求
         "username": username,
         "password": prekey + password + lastkey,
     }  # post数据
-    # print(postdata)
     pr = requests.post(
         posturl, cookies=cookies, headers=headers, data=postdata
     )  # 发送post登录请求
@@ -463,25 +462,60 @@ class Problem(QMainWindow, Ui_problem):
         global cookies
         global headers
         Problem.problem_set = []
-        url = "https://gmoj.net/senior/index.php/main/problemset/" + \
-            str(Problem.page) + "?search=" + Problem.search
-        try:
-            r = requests.get(url, headers=headers, cookies=cookies)
-        except:
-            return -1
-        b = BeautifulSoup(r.text, "html.parser").find(
-            class_="problemset_table").table.tbody
-        for i in b.find_all(style="height:0px"):
-            Problem.problem_set.append(
-                {
-                    "pid": i.find(class_="pid").a.text,
-                    "title": i.find(class_="title").a.text,
-                    "source": i.find(class_="source").text,
-                    "solvedCount": i.find(class_="solvedCount").a.span.text,
-                    "submitCount": i.find(class_="submitCount").a.span.text,
-                    "avg": i.find(class_="avg").a.span.text,
-                }
-            )
+        for i in range(1, Problem.lastpage + 1):
+            url = "https://gmoj.net/senior/index.php/main/problemset/" + \
+                str(Problem.page) + "?search=" + Problem.search
+            try:
+                r = requests.get(url, headers=headers, cookies=cookies)
+            except:
+                return -1
+            b = BeautifulSoup(r.text, "html.parser").find(
+                class_="problemset_table").table.tbody
+            for i in b.find_all(style="height:0px"):
+                Problem.problem_set.append(
+                    {
+                        "pid": i.find(class_="pid").a.text,
+                        "title": i.find(class_="title").a.text,
+                        "source": i.find(class_="source").text,
+                        "solvedCount": i.find(class_="solvedCount").a.span.text,
+                        "submitCount": i.find(class_="submitCount").a.span.text,
+                        "avg": i.find(class_="avg").a.span.text,
+                    }
+                )
+        if str(Problem.search).isdigit():
+            num = int(Problem.search)
+            if num < 1000 or num > 12000:
+                return
+            if self.get_problem(str(num)) == -1:
+                return
+            b = ""
+            with open(cfg.cacheFolder.value+"\\" + str(num) + "\\"+"o_" + str(num) + ".html", "r", encoding="utf-8") as f:
+                b = f.read()
+            b = BeautifulSoup(b, "html.parser")
+            all = b.find(class_="row-fluid")
+            head = all.find(style="text-align: center")
+            title = head.find("h2").text
+            url = "https://gmoj.net/senior/index.php/main/problemset/" + \
+                '1' + "?search=" + str(title)[6:]
+            try:
+                r = requests.get(url, headers=headers, cookies=cookies)
+            except:
+                return -1
+            bb = BeautifulSoup(r.text, "html.parser").find(
+                class_="problemset_table").table.tbody
+            for i in bb.find_all(style="height:0px"):
+                if i.find(class_="pid").a.text == str(num):
+                    Problem.problem_set.append(
+                        {
+                            "pid": i.find(class_="pid").a.text,
+                            "title": i.find(class_="title").a.text,
+                            "source": i.find(class_="source").text,
+                            "solvedCount": i.find(class_="solvedCount").a.span.text,
+                            "submitCount": i.find(class_="submitCount").a.span.text,
+                            "avg": i.find(class_="avg").a.span.text,
+                        })
+                    break
+            Problem.problem_set.sort(key=lambda x: int(x["pid"]))
 
     def View_problem(self):
         self.getPage()
@@ -633,13 +667,12 @@ class Problem(QMainWindow, Ui_problem):
         end = 0  # 1:样例 2:输入 3:输出
         for i in body.find_all(class_="well"):
             if cnt == 4:
-                end = 2
                 t = i.fieldset.pre.text
                 tt = ""
                 for line in t.splitlines():
                     if line == "" or line == " ":
                         continue
-                    if (line.find("Sample") != -1 or line.find("样例") != -1 or line.find("说明") != -1) and len(line) <= 7:
+                    if (((line.find("Sample") != -1) or (line.find("样例") != -1) or (line.find("说明") != -1) or (line.find("输入") != -1) or (line.find("输出") != -1)) and (len(line) <= 7)):
                         if tt != "":
                             if end == 1:
                                 example_explain.append(tt)
@@ -658,7 +691,9 @@ class Problem(QMainWindow, Ui_problem):
                         elif line.find("Output") != -1 or line.find("输出") != -1:
                             end = 3
                     else:
-                        tt += line + "\n"
+                        tt = tt + line + "\n"
+                if end == 0:
+                    end = 2
                 if tt != "":
                     if end == 1:
                         example_explain.append(tt)
@@ -671,13 +706,13 @@ class Problem(QMainWindow, Ui_problem):
                         end = 0
                 end = 0
             elif cnt == 5:
-                end = 3
+                end = 0
                 t = i.fieldset.pre.text
                 tt = ""
                 for line in t.splitlines():
                     if line == "" or line == " ":
                         continue
-                    if line.find("Sample") != -1 or line.find("样例") != -1 or line.find("说明") != -1 and len(line) < 7:
+                    if (((line.find("Sample") != -1) or (line.find("样例") != -1) or (line.find("说明") != -1) or (line.find("输入") != -1) or (line.find("输出") != -1)) and (len(line) < 7)):
                         if tt != "":
                             if end == 1:
                                 example_explain.append(tt)
@@ -696,7 +731,9 @@ class Problem(QMainWindow, Ui_problem):
                         elif line.find("Output") != -1 or line.find("输出") != -1:
                             end = 3
                     else:
-                        tt += line + "\n"
+                        tt = tt + line + "\n"
+                if end == 0:
+                    end = 3
                 if tt != "":
                     if end == 1:
                         example_explain.append(tt)
@@ -708,9 +745,6 @@ class Problem(QMainWindow, Ui_problem):
                         example_out.append(tt)
                         end = 0
             cnt += 1
-        print(len(example_in))
-        print(len(example_out))
-        print(len(example_explain))
         return
 
     def problem_html(self, id):
@@ -726,9 +760,9 @@ class Problem(QMainWindow, Ui_problem):
         for i in b.find_all(class_="btn btn-mini btn_copy"):
             i.decompose()
         all = b.find(class_="row-fluid")
-        head = all.find(style="text-align: center")
         body = b.find(id="problem_show_container").find(
             id="mainbar").find(id="problem_main_content")
+        head = all.find(style="text-align: center")
         title = head.find("h2").text
         with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w+", encoding="utf-8") as f:
             f.write("<head>\n")
