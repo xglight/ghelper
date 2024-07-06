@@ -7,6 +7,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from Ui_home import Ui_home
 from Ui_user import Ui_user
 from Ui_login import Ui_login
@@ -15,6 +16,7 @@ import requests
 from bs4 import *
 import base64
 import os
+import re
 import pdfkit
 
 
@@ -63,6 +65,7 @@ def load_json():
             path += i
     if f == False:
         cfg.set(cfg.wkhtmltopdf, "")
+
 
 def htmlToPdf(html, to_file):  # html转pdf
     path_wkthmltopdf = (
@@ -384,6 +387,20 @@ class Setting(QMainWindow):
         self.setObjectName(text.replace(" ", "-"))
 
 
+class HTMLView(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlags(Qt.WindowCloseButtonHint)
+        self.setWindowTitle("HTML Viewer")
+        self.resize(1000, 800)
+        self.broswer = QWebEngineView()
+        self.broswer.load(QUrl.fromLocalFile("problem.html"))
+        self.hBoxLayout = QHBoxLayout(self)
+        self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
+        self.hBoxLayout.addWidget(self.broswer)
+        self.setLayout(self.hBoxLayout)
+
+
 class Problem(QMainWindow, Ui_problem):
     lastpage = 0
     page = 0
@@ -537,12 +554,14 @@ class Problem(QMainWindow, Ui_problem):
     def open_problem(self, row, column):
         if column == 2:
             pid = self.Problem.item(row, 1).text()
-            p = self.get_problem(pid)
-            if p != 1:
-                self.login_error()
-                return -1
-            
-    
+            self.get_problem(pid)
+            win = HTMLView()
+            win.broswer.load(QUrl.fromLocalFile(
+                cfg.cacheFolder.value+"\\" + str(pid) + "\\" + str(pid) + ".html"))
+            win.broswer.setWindowTitle(pid)
+            win.show()
+            win.exec_()
+
     def login_error(self):
         InfoBar.error(
             title="错误",
@@ -584,35 +603,211 @@ class Problem(QMainWindow, Ui_problem):
         with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + "o_" + str(id) + ".html", "w", encoding="utf-8") as f:
             f.write(str(b))
         if b.find(id="problem_description") == None:  # 判断是否为markdown
-            if self.problem_html(id)== 1:
+            if self.problem_html(id) == 1:
                 return 1
         else:
             print(-1)
         #     getMarkdown(b, str(title), str(title) + "/")
         # TODO: 增加markdown渲染功能
 
-    def problem_html(self, id):
+    example_in = []
+    example_out = []
+    example_explain = []
+
+    def get_html_example(self, id):
+        global example_in
+        global example_out
+        global example_explain
+        example_in = []
+        example_out = []
+        example_explain = []
         b = ""
-        if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
-            os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
-        if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)+"\\" + str(id) + ".html"):
-            return -1
         with open(cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html", "r", encoding="utf-8") as f:
             b = f.read()
         b = BeautifulSoup(b, "html.parser")
         for i in b.find_all(class_="btn btn-mini btn_copy"):
             i.decompose()
+        body = b.find(id="problem_show_container").find(
+            id="mainbar").find(id="problem_main_content")
+        cnt = 1
+        end = 0  # 1:样例 2:输入 3:输出
+        for i in body.find_all(class_="well"):
+            if cnt == 4:
+                end = 2
+                t = i.fieldset.pre.text
+                tt = ""
+                for line in t.splitlines():
+                    if line == "" or line == " ":
+                        continue
+                    if (line.find("Sample") != -1 or line.find("样例") != -1 or line.find("说明") != -1) and len(line) <= 7:
+                        if tt != "":
+                            if end == 1:
+                                example_explain.append(tt)
+                                end = 0
+                            elif end == 2:
+                                example_in.append(tt)
+                                end = 0
+                            elif end == 3:
+                                example_out.append(tt)
+                                end = 0
+                            tt = ""
+                        if (line.find("Explanation") != -1 or line.find("说明") != -1 or line.find("解释") != -1):
+                            end = 1
+                        elif (line.find("Input") != -1 or line.find("输入") != -1):
+                            end = 2
+                        elif line.find("Output") != -1 or line.find("输出") != -1:
+                            end = 3
+                    else:
+                        tt += line + "\n"
+                if tt != "":
+                    if end == 1:
+                        example_explain.append(tt)
+                        end = 0
+                    elif end == 2:
+                        example_in.append(tt)
+                        end = 0
+                    elif end == 3:
+                        example_out.append(tt)
+                        end = 0
+                end = 0
+            elif cnt == 5:
+                end = 3
+                t = i.fieldset.pre.text
+                tt = ""
+                for line in t.splitlines():
+                    if line == "" or line == " ":
+                        continue
+                    if line.find("Sample") != -1 or line.find("样例") != -1 or line.find("说明") != -1 and len(line) < 7:
+                        if tt != "":
+                            if end == 1:
+                                example_explain.append(tt)
+                                end = 0
+                            elif end == 2:
+                                example_in.append(tt)
+                                end = 0
+                            elif end == 3:
+                                example_out.append(tt)
+                                end = 0
+                            tt = ""
+                        if (line.find("Explanation") != -1 or line.find("说明") != -1 or line.find("解释") != -1):
+                            end = 1
+                        elif (line.find("Input") != -1 or line.find("输入") != -1):
+                            end = 2
+                        elif line.find("Output") != -1 or line.find("输出") != -1:
+                            end = 3
+                    else:
+                        tt += line + "\n"
+                if tt != "":
+                    if end == 1:
+                        example_explain.append(tt)
+                        end = 0
+                    elif end == 2:
+                        example_in.append(tt)
+                        end = 0
+                    elif end == 3:
+                        example_out.append(tt)
+                        end = 0
+            cnt += 1
+        print(len(example_in))
+        print(len(example_out))
+        print(len(example_explain))
+        return
+
+    def problem_html(self, id):
+        b = ""
+        if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
+            os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
+        if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)+"\\"+"o_" + str(id) + ".html"):
+            return -1
+        self.get_html_example(id)
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html", "r", encoding="utf-8") as f:
+            b = f.read()
+        b = BeautifulSoup(b, "html.parser")
+        for i in b.find_all(class_="btn btn-mini btn_copy"):
+            i.decompose()
+        all = b.find(class_="row-fluid")
+        head = all.find(style="text-align: center")
+        body = b.find(id="problem_show_container").find(
+            id="mainbar").find(id="problem_main_content")
+        title = head.find("h2").text
         with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w+", encoding="utf-8") as f:
             f.write("<head>\n")
             f.write('  <meta charset="utf-8">\n')
-            f.write("</head>\n")  # 写入编码
-            f.write(str(b.find(class_="row-fluid")))
-            f.write(str(b.find(id="problem_show_container").find(class_="span9")))
-            f.write(str(b.style))
-            f.write(str(b.find(type="text/javascript")))
-        print(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html")
-        print(cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
-        htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
+            f.write('  <title>{0}</title>\n'.format(title))
+            f.write("</head>\n")
+            f.write("<body style=\"margin-left: 20%; margin-right: 20%;\">\n")
+            f.write("<h2 style=\"text-align: center;\">{0}</h2>".format(title))
+            if head.find("h4").find("span") != None:
+                in_name = ""
+                out_name = ""
+                for i in head.find("h4").find_all("span"):
+                    if in_name == "":
+                        in_name = i.text
+                    else:
+                        out_name = i.text
+                f.write("  <h4 style=\"text-align: center\">Input:<span style=\"color: red; font-weight: bold;\">{0}</span>,Output:<span style=\"color: red; font-weight: bold;\">{1}</span></h4>\n".format(
+                    in_name, out_name))
+            else:
+                f.write("  <h4 style=\"text-align: center\">File IO</h4>\n")
+            time_limit = 0
+            memory_limit = 0
+            for i in head.find(id="problem_judge_details").find_all("span"):
+                if time_limit == 0:
+                    company = ''.join(re.findall(r'[A-Za-z]', i.text))
+                    number = re.sub('\D', '', i.text)
+                    if company == 's' or company == 'S':
+                        time_limit = int(number)*1000
+                    else:
+                        time_limit = int(number)
+                else:
+                    company = ''.join(re.findall(r'[A-Za-z]', i.text))
+                    number = re.sub('\D', '', i.text)
+                    if company == 'kb' or company == 'KB':
+                        memory_limit = int(number)
+                    else:
+                        memory_limit = int(number)*1024
+            f.write(
+                "  <h4 style=\"text-align: center\">Time Limit: {0} ms, Memory Limit: {1} KB</h4>\n".format(time_limit, memory_limit))
+            cnt = 1
+            for i in body.find_all(class_="well"):
+                if cnt == 1:
+                    f.write("  <h4>题目描述</h4>\n")
+                    f.write("  <p>\n")
+                    f.write(str(i.fieldset.div))
+                    f.write("  </p>\n")
+                elif cnt == 2:
+                    f.write("  <h4>输入格式</h4>\n")
+                    f.write("  <p>\n")
+                    f.write(str(i.fieldset.div))
+                    f.write("  </p>\n")
+                elif cnt == 3:
+                    f.write("  <h4>输出格式</h4>\n")
+                    f.write("  <p>\n")
+                    f.write(str(i.fieldset.div))
+                    f.write("  </p>\n")
+                elif cnt == 4:
+                    for j in range(len(example_in)):
+                        f.write("  <h4>样例输入{0}</h4>\n".format(j+1))
+                        f.write("  <pre>\n")
+                        f.write(example_in[j])
+                        f.write("  </pre>\n")
+                        f.write("  <h4>样例输出{0}</h4>\n".format(j+1))
+                        f.write("  <pre>\n")
+                        f.write(example_out[j])
+                        f.write("  </pre>\n")
+                        if len(example_explain) > 0:
+                            f.write("  <h4>样例解释{0}</h4>\n".format(j+1))
+                            f.write("  <pre>\n")
+                            f.write(example_explain[j])
+                            f.write("  </pre>\n")
+                elif cnt > 5:
+                    f.write("  <h4>{0}</h4>\n".format(i.legend.h4.text))
+                    f.write("  <p>\n")
+                    f.write(str(i.fieldset.div))
+                    f.write("  </p>\n")
+                cnt += 1
+        htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html",
+                  cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
         return 1
 
 
