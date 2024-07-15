@@ -18,6 +18,7 @@ import base64
 import os
 import re
 import pdfkit
+from markdown import markdown
 
 
 def base64Encry(plaintext):  # base64加密
@@ -53,6 +54,8 @@ def load_json():
     f = False
     for i in environment_path:
         if i == ";":
+            if os.path.exists(path) == 0:
+                continue
             for i in os.listdir(path):
                 if i == "wkhtmltopdf.exe":
                     cfg.set(cfg.wkhtmltopdf, path+"/")
@@ -63,8 +66,6 @@ def load_json():
             path = ""
         else:
             path += i
-    if f == False:
-        cfg.set(cfg.wkhtmltopdf, "")
 
 
 def htmlToPdf(html, to_file):  # html转pdf
@@ -119,7 +120,7 @@ class Config(QConfig):
         "Folders", "Download", "download", FolderValidator())
     cacheFolder = ConfigItem("Folders", "Cache", "cache", FolderValidator())
     wkhtmltopdf = ConfigItem(
-        "Folders", "Wkhtmltopdf", "wkhtmltopdf", FolderValidator())
+        "Folders", "Wkhtmltopdf", "Wkhtmltopdf", FolderValidator())
 
 
 class Demo(FramelessWindow):
@@ -419,8 +420,10 @@ class Problem(QMainWindow, Ui_problem):
         self.Choose_reverse.clicked.connect(self.check_reverse)
         self.Jump_up.clicked.connect(self.jump_up)
         self.Jump_down.clicked.connect(self.jump_down)
+        self.Jump.clicked.connect(self.jump_page)
         self.setObjectName(text.replace(" ", "-"))
         self.Problem.cellDoubleClicked.connect(self.open_problem)
+        self.search_problem()
 
     def search_problem(self):
         global cookies
@@ -458,64 +461,34 @@ class Problem(QMainWindow, Ui_problem):
         Problem.page = 1
         self.View_problem()
 
+    def cache_problem_path(self, id):
+        return cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html"
+
     def getPage(self):
         global cookies
         global headers
         Problem.problem_set = []
-        for i in range(1, Problem.lastpage + 1):
-            url = "https://gmoj.net/senior/index.php/main/problemset/" + \
-                str(Problem.page) + "?search=" + Problem.search
-            try:
-                r = requests.get(url, headers=headers, cookies=cookies)
-            except:
-                return -1
-            b = BeautifulSoup(r.text, "html.parser").find(
-                class_="problemset_table").table.tbody
-            for i in b.find_all(style="height:0px"):
-                Problem.problem_set.append(
-                    {
-                        "pid": i.find(class_="pid").a.text,
-                        "title": i.find(class_="title").a.text,
-                        "source": i.find(class_="source").text,
-                        "solvedCount": i.find(class_="solvedCount").a.span.text,
-                        "submitCount": i.find(class_="submitCount").a.span.text,
-                        "avg": i.find(class_="avg").a.span.text,
-                    }
-                )
-        if str(Problem.search).isdigit():
-            num = int(Problem.search)
-            if num < 1000 or num > 12000:
-                return
-            if self.get_problem(str(num)) == -1:
-                return
-            b = ""
-            with open(cfg.cacheFolder.value+"\\" + str(num) + "\\"+"o_" + str(num) + ".html", "r", encoding="utf-8") as f:
-                b = f.read()
-            b = BeautifulSoup(b, "html.parser")
-            all = b.find(class_="row-fluid")
-            head = all.find(style="text-align: center")
-            title = head.find("h2").text
-            url = "https://gmoj.net/senior/index.php/main/problemset/" + \
-                '1' + "?search=" + str(title)[6:]
-            try:
-                r = requests.get(url, headers=headers, cookies=cookies)
-            except:
-                return -1
-            bb = BeautifulSoup(r.text, "html.parser").find(
-                class_="problemset_table").table.tbody
-            for i in bb.find_all(style="height:0px"):
-                if i.find(class_="pid").a.text == str(num):
-                    Problem.problem_set.append(
-                        {
-                            "pid": i.find(class_="pid").a.text,
-                            "title": i.find(class_="title").a.text,
-                            "source": i.find(class_="source").text,
-                            "solvedCount": i.find(class_="solvedCount").a.span.text,
-                            "submitCount": i.find(class_="submitCount").a.span.text,
-                            "avg": i.find(class_="avg").a.span.text,
-                        })
-                    break
-            Problem.problem_set.sort(key=lambda x: int(x["pid"]))
+        url = "https://gmoj.net/senior/index.php/main/problemset/" + \
+            str(Problem.page) + "?search=" + Problem.search
+        try:
+            r = requests.get(url, headers=headers, cookies=cookies)
+        except:
+            return -1
+        b = BeautifulSoup(r.text, "html.parser").find(
+            class_="problemset_table").table.tbody
+        with open(self.cache_problem_path(123), "w", encoding="utf-8") as f:
+            f.write(str(b))
+        for i in b.find_all(style="height:0px"):
+            Problem.problem_set.append(
+                {
+                    "pid": i.find(class_="pid").a.text,
+                    "title": i.find(class_="title").a.text,
+                    "source": i.find(class_="source").text,
+                    "solvedCount": i.find(class_="solvedCount").a.span.text,
+                    "submitCount": i.find(class_="submitCount").a.span.text,
+                    "avg": i.find(class_="avg").a.span.text,
+                 }
+            )
 
     def View_problem(self):
         self.getPage()
@@ -531,31 +504,23 @@ class Problem(QMainWindow, Ui_problem):
         self.Problem.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.Problem.setSelectionMode(QAbstractItemView.NoSelection)
         self.Problem.verticalHeader().setVisible(False)
-        self.Problem.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
-        )
+        self.Problem.setColumnWidth(0,35)
+        self.Problem.setColumnWidth(1,50)
+        self.Problem.setColumnWidth(2,260)
+        self.Problem.setColumnWidth(3,289)
+        self.Problem.setColumnWidth(4,60)
+        self.Problem.setColumnWidth(5,60)
+        self.Problem.setColumnWidth(6,60)
+        Labels = ["pid", "title", "source",
+                  "solvedCount", "submitCount", "avg"]
         for i in range(len(Problem.problem_set)):
             self.check = QTableWidgetItem()
             self.check.setCheckState(Qt.Unchecked)  # 把checkBox设为未选中状态
             self.Problem.setItem(i, 0, self.check)
-        for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 1, QTableWidgetItem(
-                Problem.problem_set[i]["pid"]))
-        for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 2, QTableWidgetItem(
-                Problem.problem_set[i]["title"]))
-        for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 3, QTableWidgetItem(
-                Problem.problem_set[i]["source"]))
-        for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 4, QTableWidgetItem(
-                Problem.problem_set[i]["solvedCount"]))
-        for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 5, QTableWidgetItem(
-                Problem.problem_set[i]["submitCount"]))
-        for i in range(len(Problem.problem_set)):
-            self.Problem.setItem(i, 6, QTableWidgetItem(
-                Problem.problem_set[i]["avg"]))
+            for j in range(1, 6+1):
+                    self.Problem.setItem(i, j, QTableWidgetItem(
+                        Problem.problem_set[i][Labels[j-1]]))
+                    self.Problem.item(i, j).setTextAlignment(Qt.AlignCenter)
 
     def check_problem(self, item):
         h = item.row()
@@ -573,6 +538,15 @@ class Problem(QMainWindow, Ui_problem):
         if Problem.page < Problem.lastpage:
             Problem.page += 1
             self.View_problem()
+    def jump_page(self):
+        print(self.Jump_page.text())
+        try:
+            page = int(self.Jump_page.text())
+            if page > 0 and page <= Problem.lastpage:
+                Problem.page = page
+                self.View_problem()
+        except:
+            pass
 
     def check_all(self):
         for i in range(self.Problem.rowCount()):
@@ -634,19 +608,48 @@ class Problem(QMainWindow, Ui_problem):
         if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)):
             os.makedirs(cfg.cacheFolder.value + "\\" + str(id))
         title = str(title)
-        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + "o_" + str(id) + ".html", "w", encoding="utf-8") as f:
+        with open(self.cache_problem_path(id), "w", encoding="utf-8") as f:
             f.write(str(b))
         if b.find(id="problem_description") == None:  # 判断是否为markdown
             if self.problem_html(id) == 1:
                 return 1
         else:
-            print(-1)
+            if self.problem_markdown(id) == 1:
+                return 1
+
         #     getMarkdown(b, str(title), str(title) + "/")
         # TODO: 增加markdown渲染功能
 
     example_in = []
     example_out = []
     example_explain = []
+
+    def update_example(self, id, end, tt):
+        if tt == "":
+            return
+        if end == 1:
+            if id != 0:
+                while len(example_explain) < id:
+                    example_explain.append("")
+                example_explain[id-1] = tt
+            else:
+                example_explain.append(tt)
+        elif end == 2:
+            if id != 0:
+                while len(example_in) < id:
+                    example_in.append("")
+                example_in[id-1] = tt
+            else:
+                example_in.append(tt)
+        elif end == 3:
+            if id != 0:
+                while len(example_out) < id:
+                    example_out.append("")
+                example_out[id-1] = tt
+            else:
+                example_out.append(tt)
+        end = 0
+        tt = ""
 
     def get_html_example(self, id):
         global example_in
@@ -656,7 +659,7 @@ class Problem(QMainWindow, Ui_problem):
         example_out = []
         example_explain = []
         b = ""
-        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html", "r", encoding="utf-8") as f:
+        with open(self.cache_problem_path(id), "r", encoding="utf-8") as f:
             b = f.read()
         b = BeautifulSoup(b, "html.parser")
         for i in b.find_all(class_="btn btn-mini btn_copy"):
@@ -665,96 +668,50 @@ class Problem(QMainWindow, Ui_problem):
             id="mainbar").find(id="problem_main_content")
         cnt = 1
         end = 0  # 1:样例 2:输入 3:输出
-        for i in body.find_all(class_="well"):
-            if cnt == 4:
-                t = i.fieldset.pre.text
-                tt = ""
-                for line in t.splitlines():
-                    if line == "" or line == " ":
-                        continue
-                    if (((line.find("Sample") != -1) or (line.find("样例") != -1) or (line.find("说明") != -1) or (line.find("输入") != -1) or (line.find("输出") != -1)) and (len(line) <= 7)):
-                        if tt != "":
-                            if end == 1:
-                                example_explain.append(tt)
-                                end = 0
-                            elif end == 2:
-                                example_in.append(tt)
-                                end = 0
-                            elif end == 3:
-                                example_out.append(tt)
-                                end = 0
-                            tt = ""
-                        if (line.find("Explanation") != -1 or line.find("说明") != -1 or line.find("解释") != -1):
-                            end = 1
-                        elif (line.find("Input") != -1 or line.find("输入") != -1):
-                            end = 2
-                        elif line.find("Output") != -1 or line.find("输出") != -1:
-                            end = 3
-                    else:
-                        tt = tt + line + "\n"
-                if end == 0:
-                    end = 2
-                if tt != "":
-                    if end == 1:
-                        example_explain.append(tt)
-                        end = 0
-                    elif end == 2:
-                        example_in.append(tt)
-                        end = 0
-                    elif end == 3:
-                        example_out.append(tt)
-                        end = 0
-                end = 0
-            elif cnt == 5:
-                end = 0
-                t = i.fieldset.pre.text
-                tt = ""
-                for line in t.splitlines():
-                    if line == "" or line == " ":
-                        continue
-                    if (((line.find("Sample") != -1) or (line.find("样例") != -1) or (line.find("说明") != -1) or (line.find("输入") != -1) or (line.find("输出") != -1)) and (len(line) < 7)):
-                        if tt != "":
-                            if end == 1:
-                                example_explain.append(tt)
-                                end = 0
-                            elif end == 2:
-                                example_in.append(tt)
-                                end = 0
-                            elif end == 3:
-                                example_out.append(tt)
-                                end = 0
-                            tt = ""
-                        if (line.find("Explanation") != -1 or line.find("说明") != -1 or line.find("解释") != -1):
-                            end = 1
-                        elif (line.find("Input") != -1 or line.find("输入") != -1):
-                            end = 2
-                        elif line.find("Output") != -1 or line.find("输出") != -1:
-                            end = 3
-                    else:
-                        tt = tt + line + "\n"
-                if end == 0:
-                    end = 3
-                if tt != "":
-                    if end == 1:
-                        example_explain.append(tt)
-                        end = 0
-                    elif end == 2:
-                        example_in.append(tt)
-                        end = 0
-                    elif end == 3:
-                        example_out.append(tt)
-                        end = 0
-            cnt += 1
+        id = 0
+        for i in body.find(class_="div_samplecase_plaintext").find_all("div"):
+            text = i.pre.text
+            file = ""
+            id = 0
+            t = i.h5.span.text
+            if (t.find("Explanation") != -1 or t.find("说明") != -1 or t.find("解释") != -1):
+                end = 1
+            elif (t.find("Input") != -1 or t.find("输入") != -1):
+                end = 2
+            elif t.find("Output") != -1 or t.find("输出") != -1:
+                end = 3
+
+            for line in text.splitlines():
+                if line == "" or line == " ":
+                    continue
+                if (((line.find("Sample") != -1) or (line.find("样例") != -1) or (line.find("说明") != -1) or (line.find("输入") != -1) or (line.find("输出") != -1)) and (len(line) <= 7)):
+                    self.update_example(id, end, file)
+                    file = ""
+                    end = -1
+                    id = 0
+                    cost = re.findall(r'[1-9]+\.?[0-9]*', line)
+                    if len(cost) > 0:
+                        id = int(cost[0])
+                    if (line.find("Explanation") != -1 or line.find("说明") != -1 or line.find("解释") != -1):
+                        end = 1
+                    elif (line.find("Input") != -1 or line.find("输入") != -1):
+                        end = 2
+                    elif line.find("Output") != -1 or line.find("输出") != -1:
+                        end = 3
+                else:
+                    file = file + line + "\n"
+            self.update_example(id, end, file)
+            end = 0
         return
 
     def problem_html(self, id):
         b = ""
         if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
             os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
-        if not os.path.exists(cfg.cacheFolder.value+"\\" + str(id)+"\\"+"o_" + str(id) + ".html"):
+        if not os.path.exists(self.cache_problem_path(id)):
             return -1
         self.get_html_example(id)
-        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html", "r", encoding="utf-8") as f:
+        with open(self.cache_problem_path(id), "r", encoding="utf-8") as f:
             b = f.read()
         b = BeautifulSoup(b, "html.parser")
         for i in b.find_all(class_="btn btn-mini btn_copy"):
@@ -829,11 +786,11 @@ class Problem(QMainWindow, Ui_problem):
                         f.write("  <pre>\n")
                         f.write(example_out[j])
                         f.write("  </pre>\n")
-                        if len(example_explain) > 0:
+                        if ((len(example_explain) > 0) and (int(len(example_explain)) > j)):
                             f.write("  <h4>样例解释{0}</h4>\n".format(j+1))
-                            f.write("  <pre>\n")
+                            f.write("  <div class=\"test_div\" style=\"word-wrap:break-word;\">\n")
                             f.write(example_explain[j])
-                            f.write("  </pre>\n")
+                            f.write("  </div>\n")
                 elif cnt > 5:
                     f.write("  <h4>{0}</h4>\n".format(i.legend.h4.text))
                     f.write("  <p>\n")
@@ -843,7 +800,107 @@ class Problem(QMainWindow, Ui_problem):
         htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html",
                   cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
         return 1
+    def problem_markdown(self,id):
+        b = ""
+        if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
+            os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
+        if not os.path.exists(self.cache_problem_path(id)):
+            return -1
+        self.get_html_example(id)
+        with open(self.cache_problem_path(id), "r", encoding="utf-8") as f:
+            b = f.read()
+        b = BeautifulSoup(b, "html.parser")
+        for i in b.find_all(class_="btn btn-mini btn_copy"):
+            i.decompose()
+        all = b.find(class_="row-fluid")
+        body = b.find(id="problem_show_container").find(
+            id="mainbar").find(id="problem_main_content")
+        head = all.find(style="text-align: center")
+        title = head.find("h2").text
+        script_tag = b.find('script', text=re.compile(r'const rawMarkdown'))
+        script_content = script_tag.string
+        raw_markdown_match = str(re.search(r"const rawMarkdown\s*=\s*(\{.*?\})", script_content,re.DOTALL).group(1))
+        raw_markdown_var = re.findall(r".*:", raw_markdown_match)
+        for i in raw_markdown_var:
+            i = i.replace(" ","")
+            raw_markdown_match = raw_markdown_match.replace(i, "\""+(i.replace(":", ""))+"\":")
+        raw_markdown = json.loads(raw_markdown_match)
+        title_var = ["problem_description","input_description","output_description","data","hint"]
+        title_name = ["题目描述","输入格式","输出格式","数据范围","提示"]
+        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w+", encoding="utf-8") as f:
+            f.write("<head>\n")
+            f.write('  <meta charset="utf-8">\n')
+            f.write('  <title>{0}</title>\n'.format(title))
+            f.write("  <script>\n")
+            f.write("    MathJax = {\n")
+            f.write("        tex: {inlineMath: [['$', '$'], ['\\(', '\\)']]}\n")
+            f.write("    };\n")
+            f.write("  </script>\n")
+            f.write("  <script id=\"MathJax-script\" async src=\"https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js\">\n")
+            f.write("  </script>\n")
+            f.write("</head>\n")
+            f.write("<body style=\"margin-left: 20%; margin-right: 20%;\">\n")
+            f.write("<h2 style=\"text-align: center;\">{0}</h2>".format(title))
+            if head.find("h4").find("span") != None:
+                in_name = ""
+                out_name = ""
+                for i in head.find("h4").find_all("span"):
+                    if in_name == "":
+                        in_name = i.text
+                    else:
+                        out_name = i.text
+                f.write("  <h4 style=\"text-align: center\">Input:<span style=\"color: red; font-weight: bold;\">{0}</span>,Output:<span style=\"color: red; font-weight: bold;\">{1}</span></h4>\n".format(
+                    in_name, out_name))
+            else:
+                f.write("  <h4 style=\"text-align: center\">File IO</h4>\n")
+            time_limit = 0
+            memory_limit = 0
+            for i in head.find(id="problem_judge_details").find_all("span"):
+                if time_limit == 0:
+                    company = ''.join(re.findall(r'[A-Za-z]', i.text))
+                    number = re.sub('\D', '', i.text)
+                    if company == 's' or company == 'S':
+                        time_limit = int(number)*1000
+                    else:
+                        time_limit = int(number)
+                else:
+                    company = ''.join(re.findall(r'[A-Za-z]', i.text))
+                    number = re.sub('\D', '', i.text)
+                    if company == 'kb' or company == 'KB':
+                        memory_limit = int(number)
+                    else:
+                        memory_limit = int(number)*1024
+            f.write("  <h4 style=\"text-align: center\">Time Limit: {0} ms, Memory Limit: {1} KB</h4>\n".format(time_limit, memory_limit))
+            for i in title_var:
+                if i in raw_markdown:
+                    f.write("  <h4>{0}</h4>\n".format(title_name[title_var.index(i)]))
+                    f.write("  <p>\n")
+                    html = markdown(raw_markdown[i])
+                    f.write(html)
+                    f.write("  </p>\n")
+                    if i == "output_description":
+                        for j in range(len(example_in)):
+                            f.write("  <h4>样例输入{0}</h4>\n".format(j+1))
+                            f.write("  <pre>\n")
+                            f.write(example_in[j])
+                            f.write("  </pre>\n")
+                            f.write("  <h4>样例输出{0}</h4>\n".format(j+1))
+                            f.write("  <pre>\n")
+                            f.write(example_out[j])
+                            f.write("  </pre>\n")
+                            if ((len(example_explain) > 0) and (int(len(example_explain)) > j)):
+                                f.write("  <h4>样例解释{0}</h4>\n".format(j+1))
+                                f.write("  <div class=\"test_div\" style=\"word-wrap:break-word;\">\n")
+                                f.write(example_explain[j])
+                                f.write("  </div>\n")
+            f.write("</body>\n")
 
+        htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html",
+                cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
+        return 1
+
+            
+            
 
 class Login(QMainWindow, Ui_login):
     def __init__(self, text: str, parent=None):
