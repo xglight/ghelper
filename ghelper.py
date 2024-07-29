@@ -650,8 +650,54 @@ class Problem(QMainWindow, Ui_problem):
                 example_out.append(tt)
         end = 0
         tt = ""
-
     def get_html_example(self, id):
+        global example_in
+        global example_out
+        global example_explain
+        example_in = []
+        example_out = []
+        example_explain = []
+        b = ""
+        with open(self.cache_problem_path(id), "r", encoding="utf-8") as f:
+            b = f.read()
+        b = BeautifulSoup(b, "html.parser")
+        for i in b.find_all(class_="btn btn-mini btn_copy"):
+            i.decompose()
+        body = b.find(id="problem_show_container").find(
+            id="mainbar").find(id="problem_main_content")
+        cnt = 1
+        end = 0  # 1:样例 2:输入 3:输出
+        id = 0
+        for i in body.find_all(class_="well"):
+            if cnt == 4 or cnt == 5:
+                text = i.fieldset.pre.text
+                file = ""
+                id = 0
+                end = -1
+                for line in text.splitlines():
+                    if line == "" or line == " ":
+                        continue
+                    if (((line.find("Sample") != -1) or (line.find("样例") != -1) or (line.find("说明") != -1) or (line.find("输入") != -1) or (line.find("输出") != -1)) and (len(line) <= 7)):
+                        self.update_example(id, end, file)
+                        file = ""
+                        end = -1
+                        id = 0
+                        if (line.find("Explanation") != -1 or line.find("说明") != -1 or line.find("解释") != -1):
+                            end = 1
+                        elif (line.find("Input") != -1 or line.find("输入") != -1):
+                            end = 2
+                        elif line.find("Output") != -1 or line.find("输出") != -1:
+                            end = 3
+                    else:
+                        file = file + line + "\n"
+                if end == -1:
+                    end = 2 + (cnt==5)
+                self.update_example(id, end, file)
+                end = 0
+            cnt+=1
+        return
+    
+    def get_markdown_example(self, id):
         global example_in
         global example_out
         global example_explain
@@ -806,7 +852,7 @@ class Problem(QMainWindow, Ui_problem):
             os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
         if not os.path.exists(self.cache_problem_path(id)):
             return -1
-        self.get_html_example(id)
+        self.get_markdown_example(id)
         with open(self.cache_problem_path(id), "r", encoding="utf-8") as f:
             b = f.read()
         b = BeautifulSoup(b, "html.parser")
@@ -822,12 +868,14 @@ class Problem(QMainWindow, Ui_problem):
         raw_markdown_match = str(re.search(r"const rawMarkdown\s*=\s*(\{.*?\})", script_content,re.DOTALL).group(1))
         raw_markdown_var = re.findall(r".*:", raw_markdown_match)
         for i in raw_markdown_var:
+            with open(cfg.cacheFolder.value+"/" + str(id) + "/" + "test" + ".md", "w+", encoding="utf-8") as f:
+                f.write(str(i))
             i = i.replace(" ","")
             raw_markdown_match = raw_markdown_match.replace(i, "\""+(i.replace(":", ""))+"\":")
         raw_markdown = json.loads(raw_markdown_match)
         title_var = ["problem_description","input_description","output_description","data","hint"]
         title_name = ["题目描述","输入格式","输出格式","数据范围","提示"]
-        with open(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html", "w+", encoding="utf-8") as f:
+        with open(cfg.cacheFolder.value+"/" + str(id) + "/" + str(id) + ".html", "w+", encoding="utf-8") as f:
             f.write("<head>\n")
             f.write('  <meta charset="utf-8">\n')
             f.write('  <title>{0}</title>\n'.format(title))
