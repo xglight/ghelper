@@ -31,8 +31,15 @@ def base64Decry(ciphertext):  # base64解密
     return str(base64Decry)
 
 
+wkhtmltopdf_installed = False
+
+
 def load_json():
-    global username, password, js, login_success
+    global wkhtmltopdf_installed
+    global username
+    global password
+    global js
+    global login_success
     js = {"user": {"username": "", "password": ""}}
     if not os.path.exists("config"):
         os.mkdir("config")
@@ -51,7 +58,7 @@ def load_json():
 
     environment_path = os.environ["PATH"]
     path = ""
-    f = False
+    wkhtmltopdf_installed = False
     for i in environment_path:
         if i == ";":
             if os.path.exists(path) == 0:
@@ -59,7 +66,7 @@ def load_json():
             for i in os.listdir(path):
                 if i == "wkhtmltopdf.exe":
                     cfg.set(cfg.wkhtmltopdf, path+"/")
-                    f = True
+                    wkhtmltopdf_installed = True
                     break
             if f == True:
                 break
@@ -221,17 +228,17 @@ class User(QMainWindow, Ui_user):
                 self.uid.setText(i.span.text)
             elif j == 2:
                 self.Username.setText(i.span.text)
-            elif j == 3:
-                self.Rank.setText(i.span.text)
             elif j == 4:
-                self.AC_problems.setText(i.a.span.text)
+                self.Rank.setText(i.span.text)
             elif j == 5:
-                self.Solve.setText(i.a.span.text)
+                self.AC_problems.setText(i.a.span.text)
             elif j == 6:
-                self.Submit.setText(i.a.span.text)
+                self.Solve.setText(i.a.span.text)
             elif j == 7:
+                self.Submit.setText(i.a.span.text)
+            elif j == 8:
                 self.Rate.setText(i.span.text)
-            else:
+            elif j == 9:
                 self.Description.setText(i.text)
             j += 1
 
@@ -421,9 +428,37 @@ class Problem(QMainWindow, Ui_problem):
         self.Jump_up.clicked.connect(self.jump_up)
         self.Jump_down.clicked.connect(self.jump_down)
         self.Jump.clicked.connect(self.jump_page)
+        self.Problem_download.clicked.connect(self.download_problem)
         self.setObjectName(text.replace(" ", "-"))
         self.Problem.cellDoubleClicked.connect(self.open_problem)
         self.search_problem()
+
+    def download_problem(self):
+        global cookies
+        global headers
+        global wkhtmltopdf_installed
+        if wkhtmltopdf_installed == False:
+            self.find_error()
+            return -1
+        if len(Problem.Problem_set) == 0:
+            return -1
+        for i in range(len(Problem.Problem)):
+            if self.Problem.item(i, 0).checkState() == Qt.Checked:
+                pid = Problem.Problem[i]["pid"]
+                if os.file.exists(self.cache_problem_path(pid)) == True:
+                    continue
+                self.get_problem(pid)
+
+    def find_error(self):
+        InfoBar.error(
+            title="失败",
+            content=f"未找到可用的 wkhtmltopdf.exe",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
 
     def search_problem(self):
         global cookies
@@ -487,7 +522,7 @@ class Problem(QMainWindow, Ui_problem):
                     "solvedCount": i.find(class_="solvedCount").a.span.text,
                     "submitCount": i.find(class_="submitCount").a.span.text,
                     "avg": i.find(class_="avg").a.span.text,
-                 }
+                }
             )
 
     def View_problem(self):
@@ -504,23 +539,24 @@ class Problem(QMainWindow, Ui_problem):
         self.Problem.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.Problem.setSelectionMode(QAbstractItemView.NoSelection)
         self.Problem.verticalHeader().setVisible(False)
-        self.Problem.setColumnWidth(0,35)
-        self.Problem.setColumnWidth(1,50)
-        self.Problem.setColumnWidth(2,260)
-        self.Problem.setColumnWidth(3,289)
-        self.Problem.setColumnWidth(4,60)
-        self.Problem.setColumnWidth(5,60)
-        self.Problem.setColumnWidth(6,60)
+        self.Problem.setColumnWidth(0, 35)
+        self.Problem.setColumnWidth(1, 50)
+        self.Problem.setColumnWidth(2, 260)
+        self.Problem.setColumnWidth(3, 289)
+        self.Problem.setColumnWidth(4, 60)
+        self.Problem.setColumnWidth(5, 60)
+        self.Problem.setColumnWidth(6, 60)
         Labels = ["pid", "title", "source",
                   "solvedCount", "submitCount", "avg"]
         for i in range(len(Problem.problem_set)):
             self.check = QTableWidgetItem()
             self.check.setCheckState(Qt.Unchecked)  # 把checkBox设为未选中状态
             self.Problem.setItem(i, 0, self.check)
+            self.Problem.item(i, 0).setTextAlignment(Qt.AlignCenter)
             for j in range(1, 6+1):
-                    self.Problem.setItem(i, j, QTableWidgetItem(
-                        Problem.problem_set[i][Labels[j-1]]))
-                    self.Problem.item(i, j).setTextAlignment(Qt.AlignCenter)
+                self.Problem.setItem(i, j, QTableWidgetItem(
+                    Problem.problem_set[i][Labels[j-1]]))
+                self.Problem.item(i, j).setTextAlignment(Qt.AlignCenter)
 
     def check_problem(self, item):
         h = item.row()
@@ -538,6 +574,7 @@ class Problem(QMainWindow, Ui_problem):
         if Problem.page < Problem.lastpage:
             Problem.page += 1
             self.View_problem()
+
     def jump_page(self):
         print(self.Jump_page.text())
         try:
@@ -650,6 +687,7 @@ class Problem(QMainWindow, Ui_problem):
                 example_out.append(tt)
         end = 0
         tt = ""
+
     def get_html_example(self, id):
         global example_in
         global example_out
@@ -691,12 +729,12 @@ class Problem(QMainWindow, Ui_problem):
                     else:
                         file = file + line + "\n"
                 if end == -1:
-                    end = 2 + (cnt==5)
+                    end = 2 + (cnt == 5)
                 self.update_example(id, end, file)
                 end = 0
-            cnt+=1
+            cnt += 1
         return
-    
+
     def get_markdown_example(self, id):
         global example_in
         global example_out
@@ -834,7 +872,8 @@ class Problem(QMainWindow, Ui_problem):
                         f.write("  </pre>\n")
                         if ((len(example_explain) > 0) and (int(len(example_explain)) > j)):
                             f.write("  <h4>样例解释{0}</h4>\n".format(j+1))
-                            f.write("  <div class=\"test_div\" style=\"word-wrap:break-word;\">\n")
+                            f.write(
+                                "  <div class=\"test_div\" style=\"word-wrap:break-word;\">\n")
                             f.write(example_explain[j])
                             f.write("  </div>\n")
                 elif cnt > 5:
@@ -846,7 +885,8 @@ class Problem(QMainWindow, Ui_problem):
         htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html",
                   cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
         return 1
-    def problem_markdown(self,id):
+
+    def problem_markdown(self, id):
         b = ""
         if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
             os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
@@ -865,23 +905,27 @@ class Problem(QMainWindow, Ui_problem):
         title = head.find("h2").text
         script_tag = b.find('script', text=re.compile(r'const rawMarkdown'))
         script_content = script_tag.string
-        raw_markdown_match = str(re.search(r"const rawMarkdown\s*=\s*(\{.*?\})", script_content,re.DOTALL).group(1))
+        raw_markdown_match = str(re.search(
+            r"const rawMarkdown\s*=\s*(\{.*?\})", script_content, re.DOTALL).group(1))
         raw_markdown_var = re.findall(r".*:", raw_markdown_match)
         for i in raw_markdown_var:
             with open(cfg.cacheFolder.value+"/" + str(id) + "/" + "test" + ".md", "w+", encoding="utf-8") as f:
                 f.write(str(i))
-            i = i.replace(" ","")
-            raw_markdown_match = raw_markdown_match.replace(i, "\""+(i.replace(":", ""))+"\":")
+            i = i.replace(" ", "")
+            raw_markdown_match = raw_markdown_match.replace(
+                i, "\""+(i.replace(":", ""))+"\":")
         raw_markdown = json.loads(raw_markdown_match)
-        title_var = ["problem_description","input_description","output_description","data","hint"]
-        title_name = ["题目描述","输入格式","输出格式","数据范围","提示"]
+        title_var = ["problem_description", "input_description",
+                     "output_description", "data", "hint"]
+        title_name = ["题目描述", "输入格式", "输出格式", "数据范围", "提示"]
         with open(cfg.cacheFolder.value+"/" + str(id) + "/" + str(id) + ".html", "w+", encoding="utf-8") as f:
             f.write("<head>\n")
             f.write('  <meta charset="utf-8">\n')
             f.write('  <title>{0}</title>\n'.format(title))
             f.write("  <script>\n")
             f.write("    MathJax = {\n")
-            f.write("        tex: {inlineMath: [['$', '$'], ['\\(', '\\)']]}\n")
+            f.write(
+                "        tex: {inlineMath: [['$', '$'], ['\\(', '\\)']]}\n")
             f.write("    };\n")
             f.write("  </script>\n")
             f.write("  <script id=\"MathJax-script\" async src=\"https://cdn.bootcdn.net/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js\">\n")
@@ -918,10 +962,12 @@ class Problem(QMainWindow, Ui_problem):
                         memory_limit = int(number)
                     else:
                         memory_limit = int(number)*1024
-            f.write("  <h4 style=\"text-align: center\">Time Limit: {0} ms, Memory Limit: {1} KB</h4>\n".format(time_limit, memory_limit))
+            f.write(
+                "  <h4 style=\"text-align: center\">Time Limit: {0} ms, Memory Limit: {1} KB</h4>\n".format(time_limit, memory_limit))
             for i in title_var:
                 if i in raw_markdown:
-                    f.write("  <h4>{0}</h4>\n".format(title_name[title_var.index(i)]))
+                    f.write(
+                        "  <h4>{0}</h4>\n".format(title_name[title_var.index(i)]))
                     f.write("  <p>\n")
                     html = markdown(raw_markdown[i])
                     f.write(html)
@@ -938,17 +984,16 @@ class Problem(QMainWindow, Ui_problem):
                             f.write("  </pre>\n")
                             if ((len(example_explain) > 0) and (int(len(example_explain)) > j)):
                                 f.write("  <h4>样例解释{0}</h4>\n".format(j+1))
-                                f.write("  <div class=\"test_div\" style=\"word-wrap:break-word;\">\n")
+                                f.write(
+                                    "  <div class=\"test_div\" style=\"word-wrap:break-word;\">\n")
                                 f.write(example_explain[j])
                                 f.write("  </div>\n")
             f.write("</body>\n")
 
         htmlToPdf(cfg.cacheFolder.value+"\\" + str(id) + "\\" + str(id) + ".html",
-                cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
+                  cfg.downloadFolder.value+"\\" + str(id) + "\\" + str(id) + ".pdf")
         return 1
 
-            
-            
 
 class Login(QMainWindow, Ui_login):
     def __init__(self, text: str, parent=None):
@@ -1045,6 +1090,13 @@ if __name__ == "__main__":
     cfg = Config()
     load_json()
     qconfig.load("config/config.json", cfg)
+    if cfg.wkhtmltopdf.value == "":
+        wkhtmltopdf_installed = False
+    else:
+        for i in os.listdir(cfg.wkhtmltopdf.value):
+            if i == "wkhtmltopdf.exe":
+                wkhtmltopdf_installed = True
+                break
     app = QApplication(sys.argv)
     # w=Demo()
     # w.show()
