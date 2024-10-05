@@ -521,7 +521,7 @@ class Setting(QMainWindow):
         self.settingIterface = SettingInterface(self)
         self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
         self.hBoxLayout.addWidget(self.settingIterface)
-        self.resize(900, 600)
+        self.resize(860, 560)
         self.setObjectName(text.replace(" ", "-"))
 
 
@@ -663,7 +663,7 @@ class Problem(QMainWindow, Ui_problem):
         return cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html"
 
     def getPage(self):
-        logger.info("problem view request sent. page: " + str(Problem.page))
+        logger.info("get page work. page: " + str(Problem.page))
         global cookies
         global headers
         Problem.problem_set = []
@@ -672,7 +672,7 @@ class Problem(QMainWindow, Ui_problem):
         try:
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
-            logger.error("problem view request failed.")
+            logger.error("get page request failed.")
             return -1
         b = BeautifulSoup(r.text, "html.parser").find(
             class_="problemset_table").table.tbody
@@ -689,7 +689,7 @@ class Problem(QMainWindow, Ui_problem):
             )
 
     def View_problem(self):
-        logger.debug("problem view request sent. page: " + str(Problem.page))
+        logger.debug("problem view work. page: " + str(Problem.page))
         self.getPage()
         if len(Problem.problem_set) == 0:
             return -1
