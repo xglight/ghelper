@@ -1,3 +1,4 @@
+from markdown import markdown
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget
 from qfluentwidgets import *
@@ -18,15 +19,18 @@ import base64
 import os
 import re
 import pdfkit
-from markdown import markdown
+import shutil
+from loguru import *
 
 
 def base64Encry(plaintext):  # base64加密
+    logger.debug("base64 encryption work.")
     base64Encry = str(base64.b64encode(plaintext.encode("utf-8")))
     return base64Encry[base64Encry.find("'") + 1: len(base64Encry) - 1]
 
 
 def base64Decry(ciphertext):  # base64解密
+    logger.debug("base64 decryption work.")
     base64Decry = (base64.b64decode(ciphertext)).decode("utf-8")
     return str(base64Decry)
 
@@ -35,6 +39,7 @@ wkhtmltopdf_installed = False
 
 
 def load_json():
+    logger.debug("json loading.")
     global wkhtmltopdf_installed
     global username
     global password
@@ -73,9 +78,11 @@ def load_json():
             path = ""
         else:
             path += i
+    logger.debug("json loaded.")
 
 
 def htmlToPdf(html, to_file):  # html转pdf
+    logger.info("html to pdf work.")
     path_wkthmltopdf = (
         cfg.wkhtmltopdf.value+"/" + r"wkhtmltopdf.exe"  # 需外挂wkhtmltopdf.exe + "/"
     )
@@ -97,9 +104,14 @@ login_success = False
 
 
 def login(username, password):  # 发送登录请求
+    logger.info("login request sent.")
     global cookies
     geturl = "https://gmoj.net/junior/index.php/main/home"  # 主地址（获取秘钥）
-    r = requests.get(geturl, headers=headers, timeout=1)
+    try:
+        r = requests.get(geturl, headers=headers, timeout=1)
+    except:
+        logger.error("login request failed.")
+        return -1
     cookies = r.cookies  # 获取cookies，用于之后登录（cookies可保存登录状态）
     cookies = requests.utils.dict_from_cookiejar(cookies)  # cookies格式化
     b = BeautifulSoup(r.text, "html.parser")  # 用bs4处理get的信息
@@ -118,16 +130,14 @@ def login(username, password):  # 发送登录请求
     pr = requests.post(
         posturl, cookies=cookies, headers=headers, data=postdata
     )  # 发送post登录请求
+    if pr.status_code != 200:
+        logger.warning("login failed.")
+        return -1
+    if pr.text != "success":
+        logger.warning("login failed.")
+        return -1
+    logger.info("login success.")
     return pr.text == "success"  # 判断是否成功
-
-
-class Config(QConfig):
-    # download
-    downloadFolder = ConfigItem(
-        "Folders", "Download", "download", FolderValidator())
-    cacheFolder = ConfigItem("Folders", "Cache", "cache", FolderValidator())
-    wkhtmltopdf = ConfigItem(
-        "Folders", "Wkhtmltopdf", "Wkhtmltopdf", FolderValidator())
 
 
 class Demo(FramelessWindow):
@@ -185,16 +195,20 @@ class User(QMainWindow, Ui_user):
 
     def work(self):
         global name
+        logger.info("user search request sent. username: " + name)
         url = "https://gmoj.net/senior/index.php/users/"+name
         try:
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
+            logger.error("user search request failed. username: "+name)
             return -1
         b = BeautifulSoup(r.text, 'html.parser')
         if b.find("p") != None:
             self.find_error()
+            logger.warning("user not found. username: "+name)
             return -1
         self.find_success()
+        logger.info("user found. username: "+name)
         # init
         self.Description.setText("")
         # Blog
@@ -210,7 +224,10 @@ class User(QMainWindow, Ui_user):
         if data == "":
             self.Avatar.setImage("default_avatar.png")
         else:
-            r = requests.get(data, headers=headers)
+            try:
+                r = requests.get(data, headers=headers)
+            except:
+                logger.error("avatar request failed. username: "+name)
             if r.status_code != 200:
                 self.Avatar.setImage("default_avatar.png")
             else:
@@ -275,7 +292,21 @@ class User(QMainWindow, Ui_user):
         )
 
 
+class Config(QConfig):
+    # download
+    downloadFolder = ConfigItem(
+        "Folders", "Download", "download", FolderValidator())
+    cacheFolder = ConfigItem("Folders", "Cache", "cache", FolderValidator())
+    wkhtmltopdf = ConfigItem(
+        "Folders", "Wkhtmltopdf", "Wkhtmltopdf", FolderValidator())
+
+    # log
+    loglevel = OptionsConfigItem(
+        "Log", "Loglevel", 20, OptionsValidator([10, 20, 30, 40, 50]))
+
+
 class SettingInterface(ScrollArea):
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.scrollWidget = QWidget()
@@ -303,6 +334,36 @@ class SettingInterface(ScrollArea):
             cfg.get(cfg.wkhtmltopdf),
             self.Download,
         )
+
+        self.storage = SettingCardGroup("存储", self.scrollWidget)
+        self.clearcache = PrimaryPushSettingCard(
+            text="清空",
+            icon=FIF.DELETE,
+            title="清空缓存",
+            content="清理程序的缓存文件 (cache)"
+        )
+        self.cleardownload = PrimaryPushSettingCard(
+            text="清空",
+            icon=FIF.DELETE,
+            title="清空下载",
+            content="清理程序的下载文件 (download)"
+        )
+
+        self.log = SettingCardGroup("日志", self.scrollWidget)
+        self.clearlog = PrimaryPushSettingCard(
+            text="清空",
+            icon=FIF.DELETE,
+            title="清空日志",
+            content="清理程序的日志文件 (log)"
+        )
+        self.loglevel = ComboBoxSettingCard(
+            configItem=cfg.loglevel,
+            icon=FIF.SETTING,
+            title="日志等级",
+            content="日志记录等级",
+            texts=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        )
+
         self.__initWidget()
 
     def __initWidget(self):
@@ -325,7 +386,18 @@ class SettingInterface(ScrollArea):
         self.expandLayout.setContentsMargins(30, 10, 60, 0)
         self.expandLayout.addWidget(self.Download)
 
+        self.storage.addSettingCard(self.clearcache)
+        self.storage.addSettingCard(self.cleardownload)
+
+        self.expandLayout.addWidget(self.storage)
+
+        self.log.addSettingCard(self.clearlog)
+        self.log.addSettingCard(self.loglevel)
+
+        self.expandLayout.addWidget(self.log)
+
     def cdownload(self):
+        logger.debug("download folder selected.")
         folder = QFileDialog.getExistingDirectory(self, "选择文件夹", "./")
         if not folder or cfg.get(cfg.downloadFolder) == folder:
             return
@@ -334,6 +406,7 @@ class SettingInterface(ScrollArea):
         self.download.setContent(folder)
 
     def ccache(self):
+        logger.debug("cache folder selected.")
         folder = QFileDialog.getExistingDirectory(self, "选择文件夹", "./")
         if not folder or cfg.get(cfg.cacheFolder) == folder:
             return
@@ -342,6 +415,7 @@ class SettingInterface(ScrollArea):
         self.cache.setContent(folder)
 
     def cwkhtmltopdf(self):
+        logger.debug("wkhtmltopdf folder selected.")
         folder = QFileDialog.getExistingDirectory(self, "选择文件夹", "./")
         if not folder or cfg.get(cfg.wkhtmltopdf) == folder:
             return
@@ -354,10 +428,67 @@ class SettingInterface(ScrollArea):
         self.find_error()
         return -1
 
+    def clear_cache(self):
+        logger.debug("clear cache.")
+        if QMessageBox.question(self, "警告", "确定要清空缓存吗？", QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes:
+            for i in os.listdir(cfg.get(cfg.cacheFolder)):
+                if os.path.isfile(cfg.get(cfg.cacheFolder) + "/" + i):
+                    os.remove(cfg.get(cfg.cacheFolder) + "/" + i)
+                else:
+                    shutil.rmtree(cfg.get(cfg.cacheFolder) + "/" + i)
+            InfoBar.success(
+                title="成功",
+                content=f"缓存已清空！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self,
+            )
+
+    def clear_download(self):
+        logger.debug("clear download.")
+        if QMessageBox.question(self, "警告", "确定要清空下载吗？", QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes:
+            for i in os.listdir(cfg.get(cfg.downloadFolder)):
+                if os.path.isfile(cfg.get(cfg.downloadFolder) + "/" + i):
+                    os.remove(cfg.get(cfg.downloadFolder) + "/" + i)
+                else:
+                    shutil.rmtree(cfg.get(cfg.downloadFolder) + "/" + i)
+            InfoBar.success(
+                title="成功",
+                content=f"下载已清空！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self,
+            )
+
+    def clear_log(self):
+        logger.debug("clear log.")
+        if QMessageBox.question(self, "警告", "确定要清空日志吗？", QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes:
+            for i in os.listdir("logs"):
+                try:
+                    os.remove("logs" + "/" + i)
+                except:
+                    pass
+            InfoBar.success(
+                title="成功",
+                content=f"日志已清空！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self,
+            )
+
     def __connectSignalToSlot(self):
         self.download.clicked.connect(self.cdownload)
         self.cache.clicked.connect(self.ccache)
         self.wkhtmltopdf.clicked.connect(self.cwkhtmltopdf)
+        self.clearcache.clicked.connect(self.clear_cache)
+        self.cleardownload.clicked.connect(self.clear_download)
+        self.clearlog.clicked.connect(self.clear_log)
 
     def find_error(self):
         InfoBar.error(
@@ -440,14 +571,33 @@ class Problem(QMainWindow, Ui_problem):
         if wkhtmltopdf_installed == False:
             self.find_error()
             return -1
-        if len(Problem.Problem_set) == 0:
+        if len(Problem.problem_set) == 0:
             return -1
-        for i in range(len(Problem.Problem)):
+        pid_list = []
+        for i in range(len(Problem.problem_set)):
             if self.Problem.item(i, 0).checkState() == Qt.Checked:
-                pid = Problem.Problem[i]["pid"]
-                if os.file.exists(self.cache_problem_path(pid)) == True:
-                    continue
-                self.get_problem(pid)
+                pid = Problem.problem_set[i]["pid"]
+                pid_list.append(pid)
+        if len(pid_list) == 0:
+            return -1
+        self.ProgressBar.setRange(0, 100)
+        self.ProgressBar.setValue(0)
+        cnt = 0
+        success = 0
+        jump = 0
+        error = 0
+        for i in pid_list:
+            if os.path.exists(self.cache_problem_path(i)) == False:
+                if self.get_problem(i) == 1:
+                    success += 1
+                else:
+                    error += 1
+            else:
+                jump += 1
+            cnt += 1
+            self.ProgressBar.setValue((int((1.0*cnt)/(1.0*len(pid_list))*100)))
+        self.ProgressBar.setValue(100)
+        self.download_success(success, jump, error)
 
     def find_error(self):
         InfoBar.error(
@@ -460,7 +610,19 @@ class Problem(QMainWindow, Ui_problem):
             parent=self,
         )
 
+    def download_success(self, success, jump, error):
+        InfoBar.success(
+            title="下载成功",
+            content=f"成功：{success} 跳过：{jump} 失败：{error}",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4000,
+            parent=self,
+        )
+
     def search_problem(self):
+        logger.info("problem search request sent. search: " + Problem.search)
         global cookies
         global headers
         Problem.search = str(self.Search_problem.text())
@@ -468,6 +630,7 @@ class Problem(QMainWindow, Ui_problem):
         try:
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
+            logger.error("problem search request failed.")
             return -1
         b = BeautifulSoup(r.text, "html.parser")
         with open("problem.html", "w", encoding="utf-8") as f:
@@ -500,6 +663,7 @@ class Problem(QMainWindow, Ui_problem):
         return cfg.cacheFolder.value+"\\" + str(id) + "\\"+"o_" + str(id) + ".html"
 
     def getPage(self):
+        logger.info("problem view request sent. page: " + str(Problem.page))
         global cookies
         global headers
         Problem.problem_set = []
@@ -508,11 +672,10 @@ class Problem(QMainWindow, Ui_problem):
         try:
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
+            logger.error("problem view request failed.")
             return -1
         b = BeautifulSoup(r.text, "html.parser").find(
             class_="problemset_table").table.tbody
-        with open(self.cache_problem_path(123), "w", encoding="utf-8") as f:
-            f.write(str(b))
         for i in b.find_all(style="height:0px"):
             Problem.problem_set.append(
                 {
@@ -526,6 +689,7 @@ class Problem(QMainWindow, Ui_problem):
             )
 
     def View_problem(self):
+        logger.debug("problem view request sent. page: " + str(Problem.page))
         self.getPage()
         if len(Problem.problem_set) == 0:
             return -1
@@ -559,6 +723,7 @@ class Problem(QMainWindow, Ui_problem):
                 self.Problem.item(i, j).setTextAlignment(Qt.AlignCenter)
 
     def check_problem(self, item):
+        logger.debug("problem check clicked. row: " + str(item.row()))
         h = item.row()
         if self.Problem.item(h, 0).checkState() == Qt.Checked:
             self.Problem.item(h, 0).setCheckState(Qt.Unchecked)
@@ -566,17 +731,19 @@ class Problem(QMainWindow, Ui_problem):
             self.Problem.item(h, 0).setCheckState(Qt.Checked)
 
     def jump_up(self):
+        logger.debug("problem jump up clicked. page: " + str(Problem.page))
         if Problem.page > 1:
             Problem.page -= 1
             self.View_problem()
 
     def jump_down(self):
+        logger.debug("problem jump down clicked. page: " + str(Problem.page))
         if Problem.page < Problem.lastpage:
             Problem.page += 1
             self.View_problem()
 
     def jump_page(self):
-        print(self.Jump_page.text())
+        logger.debug("problem jump page clicked. page: " + str(Problem.page))
         try:
             page = int(self.Jump_page.text())
             if page > 0 and page <= Problem.lastpage:
@@ -586,10 +753,12 @@ class Problem(QMainWindow, Ui_problem):
             pass
 
     def check_all(self):
+        logger.debug("problem check all clicked.")
         for i in range(self.Problem.rowCount()):
             self.Problem.item(i, 0).setCheckState(Qt.Checked)
 
     def check_reverse(self):
+        logger.debug("problem check reverse clicked.")
         for i in range(self.Problem.rowCount()):
             if self.Problem.item(i, 0).checkState() == Qt.Checked:
                 self.Problem.item(i, 0).setCheckState(Qt.Unchecked)
@@ -597,6 +766,8 @@ class Problem(QMainWindow, Ui_problem):
                 self.Problem.item(i, 0).setCheckState(Qt.Checked)
 
     def open_problem(self, row, column):
+        logger.debug("problem open clicked. row: " +
+                     str(row) + " column: " + str(column))
         if column == 2:
             pid = self.Problem.item(row, 1).text()
             self.get_problem(pid)
@@ -628,10 +799,12 @@ class Problem(QMainWindow, Ui_problem):
         )
 
     def get_problem(self, id):
+        logger.info("problem get request sent. id: " + str(id))
         url = "https://gmoj.net/senior/index.php/main/show/" + id
         try:
             r = requests.get(url, headers=headers, cookies=cookies)
         except:
+            logger.error("problem get request failed.")
             return -1
         b = BeautifulSoup(r.text, "html.parser")
         if str(b) == "None" or b.find(style="white-space: pre-wrap") != None:
@@ -653,7 +826,8 @@ class Problem(QMainWindow, Ui_problem):
         else:
             if self.problem_markdown(id) == 1:
                 return 1
-
+        logger.warning("problem get failed. id: " + str(id))
+        return -1
         #     getMarkdown(b, str(title), str(title) + "/")
         # TODO: 增加markdown渲染功能
 
@@ -689,6 +863,7 @@ class Problem(QMainWindow, Ui_problem):
         tt = ""
 
     def get_html_example(self, id):
+        logger.debug("problem html example work. id: " + str(id))
         global example_in
         global example_out
         global example_explain
@@ -736,6 +911,7 @@ class Problem(QMainWindow, Ui_problem):
         return
 
     def get_markdown_example(self, id):
+        logger.debug("problem markdown example work. id: " + str(id))
         global example_in
         global example_out
         global example_explain
@@ -789,6 +965,7 @@ class Problem(QMainWindow, Ui_problem):
         return
 
     def problem_html(self, id):
+        logger.info("problem html work. id: " + str(id))
         b = ""
         if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
             os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
@@ -868,7 +1045,10 @@ class Problem(QMainWindow, Ui_problem):
                         f.write("  </pre>\n")
                         f.write("  <h4>样例输出{0}</h4>\n".format(j+1))
                         f.write("  <pre>\n")
-                        f.write(example_out[j])
+                        if j < len(example_out):
+                            f.write(example_out[j])
+                        else:
+                            f.write("---None---")
                         f.write("  </pre>\n")
                         if ((len(example_explain) > 0) and (int(len(example_explain)) > j)):
                             f.write("  <h4>样例解释{0}</h4>\n".format(j+1))
@@ -887,6 +1067,7 @@ class Problem(QMainWindow, Ui_problem):
         return 1
 
     def problem_markdown(self, id):
+        logger.info("problem markdown work. id: " + str(id))
         b = ""
         if not os.path.exists(cfg.downloadFolder.value+"\\" + str(id)):
             os.makedirs(cfg.downloadFolder.value + "\\" + str(id))
@@ -1004,6 +1185,7 @@ class Login(QMainWindow, Ui_login):
         self.setObjectName(text.replace("", "-"))
 
     def cPassword(self):
+        logger.info("login work.")
         global username, password, login_success
         name = str(self.username.text())
         _password = str(self.password.text())
@@ -1087,20 +1269,22 @@ class Window(FluentWindow):
 
 
 if __name__ == "__main__":
+    logger.remove(handler_id=None)
     cfg = Config()
-    load_json()
     qconfig.load("config/config.json", cfg)
+    logger.add("logs/{time}.log", rotation="10 MB",
+               encoding="utf-8", level=cfg.loglevel.value)
+    logger.info("ghelper.exe start.")
+    load_json()
     if cfg.wkhtmltopdf.value == "":
         wkhtmltopdf_installed = False
     else:
         for i in os.listdir(cfg.wkhtmltopdf.value):
             if i == "wkhtmltopdf.exe":
                 wkhtmltopdf_installed = True
+                logger.debug("wkhtmltopdf installed.")
                 break
     app = QApplication(sys.argv)
-    # w=Demo()
-    # w.show()
-    # w.close()
     w = Window()
     w.show()
     app.exec()
