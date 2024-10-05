@@ -1278,7 +1278,7 @@ class Window(FluentWindow):
 
 
 if __name__ == "__main__":
-    # logger.remove(handler_id=None)
+    logger.remove(handler_id=None)
     cfg = Config()
     qconfig.load("config/config.json", cfg)
     logger.add("logs/{time}.log", rotation="10 MB",

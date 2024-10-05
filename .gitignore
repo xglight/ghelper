@@ -4,6 +4,9 @@ download
 config
 other
 logs
+build
+dist
+*.spec
 *.code-workspace
 *.html
 .vscode
